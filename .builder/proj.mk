@@ -26,6 +26,7 @@ AR = $(CROSS_COMPILE)ar
 OBJCOPY = $(CROSS_COMPILE)objcopy
 READELF = $(CROSS_COMPILE)readelf
 INSTALL = install -D
+STRIP = $(CROSS_COMPILE)strip -g
 
 # recursive and force remove
 RM = rm -rf
