@@ -56,14 +56,15 @@ tool_TARGET += tool/bin/mkimage
 linux_DIR = $(PWD)/package/linux
 linux_DEFCONFIG = versatile_defconfig
 linux_MAKEPARAM += ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE)
-linux_MAKEPARAM += CONFIG_INITRAMFS_SOURCE=$(CONFIG_INITRAMFS_SOURCE)
+linux_MAKEPARAM += CONFIG_INITRAMFS_SOURCE="$(CONFIG_INITRAMFS_SOURCE)"
+linux_MAKEPARAM += INSTALL_HDR_PATH="$(INSTALL_HDR_PATH)"
 
 linux_defconfig :
 	$(MAKE) linux_$(linux_DEFCONFIG) 
 
-linux_CONFIG = $(linux_DIR)/.config
+linux_CONFIG = $(linux_DIR)/.config tool/bin/mkimage
 
-$(linux_CONFIG) :
+$(linux_DIR)/.config :
 	$(MAKE) linux_config
 
 linux_config :
@@ -74,6 +75,16 @@ linux_config :
 
 $(addprefix linux_,clean distclean) :
 	 $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) $(@:linux_%=%)
+
+linux_headers_install : INSTALL_HDR_PATH ?= $(DESTDIR)
+linux_headers_install : $(linux_CONFIG)
+	$(MKDIR) $(INSTALL_HDR_PATH)
+	$(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) $(@:linux_%=%)
+
+linux_uImage : CONFIG_INITRAMFS_SOURCE ?= $(DESTDIR)
+linux_uImage : $(linux_CONFIG)
+	$(MKDIR) $(CONFIG_INITRAMFS_SOURCE)
+	$(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) $(@:linux_%=%)
 
 linux linux_% : $(linux_CONFIG)
 
@@ -101,6 +112,12 @@ busybox_config :
 
 $(addprefix busybox_,clean distclean) :
 	$(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) $(@:busybox_%=%)
+
+busybox_install : CONFIG_PREFIX ?= $(DESTDIR)
+busybox_install : $(busybox_CONFIG)
+	$(MKDIR) $(CONFIG_PREFIX)
+	$(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) $(@:busybox_%=%)
+
 
 busybox busybox_% : $(busybox_CONFIG) 
 

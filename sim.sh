@@ -107,9 +107,8 @@ function log_debug() {
 QEMU_MEM="-m 128"
 QEMU_MACH="-M versatilepb"
 QEMU_TERM="-nographic"
-BOOTARGS="root=/dev/ram console=ttyAMA0"
+BOOTARGS="-append 'root=/dev/ram console=ttyAMA0'"
 
-CMD="qemu-system-arm $QEMU_MACH $QEMU_MEM $QEMU_TERM -append \"$BOOTARGS\" $* "
+CMD="qemu-system-arm $QEMU_MACH $QEMU_MEM $QEMU_TERM $BOOTARGS $* "
 echo "CMD=$CMD"
-$CMD
-
+eval $CMD
