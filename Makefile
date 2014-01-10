@@ -8,6 +8,7 @@ RELEASEDIR ?= $(BUILDDIR)/release
 export TOOLCHAIN := $(PROJDIR)/tool/toolchain
 export CROSS_COMPILE := arm-none-linux-gnueabi-
 export PATH := $(PROJDIR)/tool/bin:$(TOOLCHAIN)/bin:$(PATH)
+SHELL := /bin/bash
 
 #------------------------------------
 #------------------------------------
@@ -17,6 +18,7 @@ all : ;
 
 test :
 	@echo "HOST is `$(CC) -dumpmachine`"
+	source $(linux_DIR)/scripts/gen_initramfs_list.sh -h
 
 #------------------------------------
 # bootloader
@@ -95,8 +97,9 @@ $(eval $(call PACKAGE1,linux))
 #------------------------------------
 busybox_DIR = $(PWD)/package/busybox
 busybox_DEFCONFIG = defconfig
+busybox_CONFIG_PREFIX ?= $(DESTDIR)
 busybox_MAKEPARAM += CROSS_COMPILE=$(CROSS_COMPILE) 
-busybox_MAKEPARAM += CONFIG_PREFIX=$(CONFIG_PREFIX)
+busybox_MAKEPARAM += CONFIG_PREFIX=$(busybox_CONFIG_PREFIX)
 
 busybox_defconfig :
 	$(MAKE) busybox_$(busybox_DEFCONFIG) 
@@ -113,9 +116,8 @@ busybox_config :
 $(addprefix busybox_,clean distclean) :
 	$(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) $(@:busybox_%=%)
 
-busybox_install : CONFIG_PREFIX ?= $(DESTDIR)
 busybox_install : $(busybox_CONFIG)
-	$(MKDIR) $(CONFIG_PREFIX)
+	$(MKDIR) $(busybox_CONFIG_PREFIX)
 	$(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) $(@:busybox_%=%)
 
 
@@ -125,17 +127,42 @@ $(eval $(call PACKAGE1,busybox))
 
 #------------------------------------
 #------------------------------------
-initramfs_rootfs :
-	-$(call OVERWRITE1,$(ROOTFSDIR),$(DESTDIR),.svn */lib/*.a)
-	cd $(ROOTFSDIR) && \
-	  find . | cpio -o --format=newc > $(RELEASEDIR)/rootfs.img
-	cd $(RELEASEDIR) && \
-	  gzip -c rootfs.img > rootfs.img.gz
+qemu_DIR = $(PWD)/package/qemu
+qemu_TARGET = i386-softmmu,x86_64-softmmu arm-softmmu
 
-initramfs : linux busybox
+qemu_CONFIG = $(qemu_DIR)/config-host.mak
+
+$(qemu_DIR)/config-host.mak :
+	$(MAKE) qemu_config
+	
+qemu_config :
+	cd $(qemu_DIR) && \
+	  ./configure --prefix=/ --target-list="$(qemu_TARGET)" 
+
+qemu qemu_% : $(qemu_CONFIG)
+	$(MAKE) DESTDIR=$(PWD)/tool -C $(qemu_DIR) $(patsubst qemu,,$(@:qemu_%=%))
+
+#------------------------------------
+#------------------------------------
+initramfs_rootfs : busybox
 	$(MAKE) CONFIG_PREFIX=$(DESTDIR) busybox_install
-	$(MAKE) initramfs_rootfs
-	$(MAKE) CONFIG_INITRAMFS_SOURCE=$(ROOTFSDIR) linux_uImage
+	-$(call OVERWRITE1,$(ROOTFSDIR),config/initramfs,.svn)
+	-$(call OVERWRITE1,$(ROOTFSDIR),$(DESTDIR),.svn */lib/*.a)
+
+initramfs_rootfs_img :
+#	cd $(ROOTFSDIR) && \
+#	  find . | cpio -o --format=newc > $(RELEASEDIR)/rootfs.img
+#	cd $(RELEASEDIR) && \
+#	  gzip -c rootfs.img > rootfs.img.gz
+#	$(RM) $(RELEASEDIR)/rootfs.img
+	$(MKDIR) $(RELEASEDIR)
+	cd $(linux_DIR) && \
+	  source scripts/gen_initramfs_list.sh -o $(RELEASEDIR)/initramfs \
+	    $(PWD)/config/initramfs_list $(ROOTFSDIR) 
+	
+initramfs : initramfs_rootfs linux
+	$(MAKE) initramfs_rootfs_img
+	$(MAKE) linux_uImage # CONFIG_INITRAMFS_SOURCE=$(ROOTFSDIR)
 	$(MKDIR) $(RELEASEDIR)
 	$(CP) $(linux_DIR)/arch/arm/boot/uImage $(RELEASEDIR)
 	$(CP) $(uboot_DIR)/u-boot.bin $(RELEASEDIR)

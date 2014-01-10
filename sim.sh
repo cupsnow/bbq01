@@ -103,12 +103,14 @@ function log_debug() {
 
 # LOG_FILTER="debug"
 
-
+QEMU="tool/bin/qemu-system-arm"
 QEMU_MEM="-m 128"
 QEMU_MACH="-M versatilepb"
 QEMU_TERM="-nographic"
-BOOTARGS="-append 'root=/dev/ram console=ttyAMA0'"
+QEMU_KERNEL="-kernel build/release/uImage" # package/linux/arch/arm/boot/uImage
+QEMU_INITRD="-initrd build/release/initramfs" # rootfs.img.gz
+QEMU_BOOTARGS="-append 'root=/dev/ram console=ttyAMA0'"
 
-CMD="qemu-system-arm $QEMU_MACH $QEMU_MEM $QEMU_TERM $BOOTARGS $* "
+CMD="$QEMU $QEMU_MACH $QEMU_MEM $QEMU_TERM $QEMU_BOOTARGS $QEMU_KERNEL $QEMU_INITRD $* "
 echo "CMD=$CMD"
 eval $CMD
