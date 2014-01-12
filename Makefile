@@ -149,12 +149,14 @@ initramfs_rootfs : busybox
 	-$(call OVERWRITE1,$(ROOTFSDIR),config/initramfs,.svn)
 	-$(call OVERWRITE1,$(ROOTFSDIR),$(DESTDIR),.svn */lib/*.a)
 
+initramfs_rootfs_cpio :
+	cd $(ROOTFSDIR) && \
+	  find . | cpio -o --format=newc > $(RELEASEDIR)/rootfs.img
+	cd $(RELEASEDIR) && \
+	  gzip -c rootfs.img > rootfs.img.gz
+	$(RM) $(RELEASEDIR)/rootfs.img
+
 initramfs_rootfs_img :
-#	cd $(ROOTFSDIR) && \
-#	  find . | cpio -o --format=newc > $(RELEASEDIR)/rootfs.img
-#	cd $(RELEASEDIR) && \
-#	  gzip -c rootfs.img > rootfs.img.gz
-#	$(RM) $(RELEASEDIR)/rootfs.img
 	$(MKDIR) $(RELEASEDIR)
 	cd $(linux_DIR) && \
 	  source scripts/gen_initramfs_list.sh -o $(RELEASEDIR)/initramfs \

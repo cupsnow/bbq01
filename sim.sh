@@ -110,7 +110,10 @@ QEMU_TERM="-nographic"
 QEMU_KERNEL="-kernel build/release/uImage" # package/linux/arch/arm/boot/uImage
 QEMU_INITRD="-initrd build/release/initramfs" # rootfs.img.gz
 QEMU_BOOTARGS="-append 'root=/dev/ram console=ttyAMA0'"
+QEMU_NET="-net nic -netdev user,id=mynet0,net=192.168.11.0/24,dhcpstart=192.168.11.1"
 
-CMD="$QEMU $QEMU_MACH $QEMU_MEM $QEMU_TERM $QEMU_BOOTARGS $QEMU_KERNEL $QEMU_INITRD $* "
+CMD="$QEMU $QEMU_MACH $QEMU_MEM $QEMU_TERM $QEMU_KERNEL $QEMU_NET"
+CMD="$CMD $QEMU_INITRD $QEMU_BOOTARGS $*"
+
 echo "CMD=$CMD"
 eval $CMD
