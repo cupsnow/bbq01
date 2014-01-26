@@ -2,6 +2,9 @@
 BUILDERDIR := $(abspath .)/.builder
 include $(BUILDERDIR)/proj.mk
 
+ # qemu beaglebone beagleboard
+BOARD = beaglebone
+
 ROOTFSDIR ?= $(BUILDDIR)/rootfs
 RELEASEDIR ?= $(BUILDDIR)/release
 
@@ -24,20 +27,25 @@ test :
 # bootloader
 #------------------------------------
 uboot_DIR = $(PWD)/package/u-boot
-uboot_DEFCONFIG = versatileqemu_config
 uboot_MAKEPARAM += ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE)
 
-uboot_defconfig :
-	$(MAKE) uboot_$(uboot_DEFCONFIG)
+uboot_qemu_defconfig = versatileqemu_config
+
+uboot_beaglebone_defconfig = am335x_evm_config
+
+uboot_beagleboard_defconfig = omap3_beagle_config
 
 uboot_CONFIG = $(uboot_DIR)/include/config.mk
+
+uboot_defconfig :
+	$(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) $(uboot_$(BOARD)_defconfig)
 
 $(uboot_CONFIG) :
 	$(MAKE) uboot_config
 
 uboot_config :
-	-$(call OVERWRITE1,$(uboot_DIR),config/uboot,.svn)
-	$(MAKE) uboot_$(uboot_DEFCONFIG)
+	-$(call OVERWRITE1,$(uboot_DIR),config/uboot_$(BOARD),.svn)
+	$(MAKE) uboot_defconfig
 
 $(addprefix uboot_,clean distclean) :
 	 $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) $(@:uboot_%=%)
@@ -56,21 +64,28 @@ tool_TARGET += tool/bin/mkimage
 # kernel
 #------------------------------------
 linux_DIR = $(PWD)/package/linux
-linux_DEFCONFIG = versatile_defconfig
 linux_MAKEPARAM += ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE)
 linux_MAKEPARAM += CONFIG_INITRAMFS_SOURCE="$(CONFIG_INITRAMFS_SOURCE)"
 linux_MAKEPARAM += INSTALL_HDR_PATH="$(INSTALL_HDR_PATH)"
+# for uImage
+linux_MAKEPARAM += LOADADDR=0x80008000
 
-linux_defconfig :
-	$(MAKE) linux_$(linux_DEFCONFIG) 
+linux_qemu_defconfig = versatile_defconfig
+
+linux_beaglebone_defconfig = omap2plus_defconfig 
+
+linux_beagleboard_defconfig = omap2plus_defconfig
 
 linux_CONFIG = $(linux_DIR)/.config tool/bin/mkimage
+
+linux_defconfig :
+	$(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) $(linux_$(BOARD)_defconfig)
 
 $(linux_DIR)/.config :
 	$(MAKE) linux_config
 
 linux_config :
-	-$(call OVERWRITE1,$(linux_DIR),config/linux,.svn)
+	-$(call OVERWRITE1,$(linux_DIR),config/linux_$(BOARD),.svn)
 	$(MAKE) linux_oldconfig
 	$(MAKE) linux_prepare
 	$(MAKE) linux_scripts
@@ -96,17 +111,16 @@ $(eval $(call PACKAGE1,linux))
 # busybox
 #------------------------------------
 busybox_DIR = $(PWD)/package/busybox
-busybox_DEFCONFIG = defconfig
-busybox_CONFIG_PREFIX ?= $(DESTDIR)
 busybox_MAKEPARAM += CROSS_COMPILE=$(CROSS_COMPILE) 
-busybox_MAKEPARAM += CONFIG_PREFIX=$(busybox_CONFIG_PREFIX)
+busybox_MAKEPARAM += CONFIG_PREFIX=$(or $(CONFIG_PREFIX),$(DESTDIR))
+busybox_MAKEPARAM += EXTRA_CFLAGS="-I$(DESTDIR)/include"
 
 busybox_defconfig :
-	$(MAKE) busybox_$(busybox_DEFCONFIG) 
+	$(MAKE) busybox_defconfig 
 
-busybox_CONFIG = $(busybox_DIR)/.config
+busybox_CONFIG = $(busybox_DIR)/.config linux_headers_install
 
-$(busybox_CONFIG) :
+$(busybox_DIR)/.config :
 	$(MAKE) busybox_config
 
 busybox_config :
@@ -117,9 +131,8 @@ $(addprefix busybox_,clean distclean) :
 	$(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) $(@:busybox_%=%)
 
 busybox_install : $(busybox_CONFIG)
-	$(MKDIR) $(busybox_CONFIG_PREFIX)
+	$(MKDIR) $(or $(CONFIG_PREFIX),$(DESTDIR))
 	$(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) $(@:busybox_%=%)
-
 
 busybox busybox_% : $(busybox_CONFIG) 
 
