@@ -1,2 +1,0 @@
-dir /dev 0755 0 0
-nod /dev/console 0660 0 0 c 5 1
