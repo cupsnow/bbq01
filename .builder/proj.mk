@@ -1,6 +1,6 @@
 # $Id$
-# BUILDER ?= $(abspath .)/.builder
-# include $(BUILDER)/proj.mk
+# BUILDERDIR ?= $(abspath .)/.builder
+# include $(BUILDERDIR)/proj.mk
 #
 # export TOOLCHAIN := $(PROJDIR)/tool/buildroot-gcc342
 # export CROSS_COMPILE := mipsel-linux-
