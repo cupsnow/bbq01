@@ -1,0 +1,81 @@
+#!/bin/sh
+
+# System Startup Script
+#
+
+. /etc/rc.d/init.d/functions
+
+[ -d /proc ] || mkdir -p /proc
+/bin/mount -t proc none /proc
+[ -d /sys ] || mkdir -p /sys
+/bin/mount -t sysfs none /sys
+
+echo -n "Start /dev ..."
+[ -d /dev ] || mkdir -p /dev
+/bin/mount -t tmpfs none /dev
+check_status
+
+[ -c /dev/null ] || mknod -m 0666 /dev/null c 1 3
+[ -c /dev/ttyS1 ] || mknod -m 0666 /dev/ttyS1 c 4 65
+if [ ! -c /dev/console ] ; then
+  echo -n "Redirect standard I/O ..."
+  mknod /dev/console c 5 1
+  CONSOLE_STDIN=/dev/console
+  CONSOLE_STDOUT=/dev/console
+  CONSOLE_STDERR=/dev/console
+  exec <$CONSOLE_STDIN >$CONSOLE_STDOUT 2>$CONSOLE_STDERR
+  check_status
+fi
+
+echo -n "Start hotplug ..."
+echo "/sbin/mdev" > /proc/sys/kernel/hotplug
+/sbin/mdev -s
+check_status
+
+echo -n "Start pseudo terminal ..."
+mkdir /dev/pts
+/bin/mount -t devpts -o mode=0755 devpts /dev/pts
+check_status
+
+/etc/rc.d/init.d/ramdisk start
+/etc/rc.d/init.d/boost start
+
+# mount mini_fo file system
+# mount -t tmpfs none /tmp
+# mount -t tmpfs none /tmp/root
+# #mount -t mini_fo -o base=/,sto=/tmp/root "mini_fo:/tmp/root" /mnt/root 2>&1
+# mount -t mini_fo -o base=/,sto=/tmp "mini_fo:/mnt/root" /mnt/root 2>&1
+# mount -o move /proc /mnt/root/proc
+# mount -o move /dev /mnt/root/dev
+# mount -o move /sys /mnt/root/sys
+# pivot_root /mnt/root /mnt/root/mnt/rom
+# mount -o move /mnt/rom/tmp /mnt/root
+# mount -t tmpfs none /tmp
+
+if [ -f /etc/hostname ] ; then
+  echo -n "Setting hostname ..."
+  hostname -F /etc/hostname
+  check_status
+fi
+
+echo -n "Setting up interface lo ..."
+ifconfig lo up 127.0.0.1
+check_status
+
+echo -n "Adding route entry for lo ..."
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+check_status
+
+if [ -f /etc/rc.d/init.d/module ] ; then
+  echo -n "Loading modules ..."
+  /etc/rc.d/init.d/module start
+  check_status
+fi
+
+echo "Running start scripts."
+for i in /etc/rc.d/start/*
+do
+	if [ -x $i ]; then
+		$i start
+	fi
+done

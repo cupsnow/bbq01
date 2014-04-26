@@ -29,12 +29,17 @@ uboot_qemu_defconfig:
 	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
 	  versatileqemu_config
 
+uboot_qemu_config:
+	$(call OVERWRITE,$(uboot_DIR),config/qemu/u-boot,.svn)
+	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
+	  versatileqemu_config
+
 uboot_clean uboot_distclean:
 	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
 	  $(patsubst uboot,,$(@:uboot_%=%))
 
 $(uboot_DIR)/include/config.h:
-	$(MAKE) uboot_defconfig
+	$(MAKE) uboot_config
 
 uboot uboot_%: | $(uboot_DIR)/include/config.h
 	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
@@ -57,12 +62,16 @@ linux_qemu_defconfig:
 	$(linux_MAKEENV) $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) \
 	  versatile_defconfig
 
+linux_qemu_config:
+	$(call OVERWRITE,$(linux_DIR),config/qemu/linux,.svn)
+	$(MAKE) linux_oldconfig linux_prepare
+
 linux_clean linux_distclean:
 	$(linux_MAKEENV) $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) \
 	  $(patsubst linux,,$(@:linux_%=%))
 
 $(linux_DIR)/.config:
-	$(MAKE) linux_defconfig
+	$(MAKE) linux_config
 
 linux linux_%: | $(linux_DIR)/.config
 	$(linux_MAKEENV) $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) \
@@ -82,12 +91,16 @@ busybox_defconfig:
 	$(busybox_MAKEENV) $(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) \
 	  defconfig
 
+busybox_config:
+	$(call OVERWRITE,$(busybox_DIR),config/common/busybox,.svn)
+	$(MAKE) busybox_oldconfig busybox_prepare
+
 busybox_clean busybox_distclean:
 	$(busybox_MAKEENV) $(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) \
 	  $(patsubst busybox,,$(@:busybox_%=%))
 
 $(busybox_DIR)/.config:
-	$(MAKE) busybox_defconfig
+	$(MAKE) busybox_config
 
 busybox busybox_%: | $(busybox_DIR)/.config
 	$(busybox_MAKEENV) $(MAKE) $(busybox_MAKEPARAM) -C $(busybox_DIR) \
@@ -97,15 +110,11 @@ busybox busybox_%: | $(busybox_DIR)/.config
 # initramfs
 #
 initramfs:
-	$(MAKE) linux linux_headers_install
-	$(MAKE) busybox_install
-	$(MAKE) initramfs_libc
+	$(MAKE) linux_headers_install
+	$(MAKE) linux busybox_install
 	$(MAKE) initramfs_prebuilt
+	$(MAKE) initramfs_rootfs
 	$(MAKE) initramfs_uImage
-
-initramfs_libc:	
-	$(MKDIR) $(DESTDIR)/lib
-	$(CP) $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/lib/* $(DESTDIR)/lib
 
 initramfs_prebuilt:
 ifneq ("$(wildcard $(PROJDIR)/config/common/prebuilt)","")
@@ -116,7 +125,29 @@ ifneq ("$(wildcard $(PROJDIR)/config/$(BOARD)/prebuilt)","")
 endif # board
 
 initramfs_uImage:
-	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(PROJDIR)/config/common/initramfs_list $(DESTDIR)" linux_uImage
+	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(PROJDIR)/config/common/initramfs_list $(ROOTFS)" linux_uImage
+	
+LIBC_SO_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/lib
+LIBC_SO += ld{-*.so,-*.so.*} 
+LIBC_SO += libgcc_s{.so,.so.*}
+LIBC_SO += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
+#LIBC_SO += libmemusage.so libpcprofile.so libSegFault.so
+#LIBC_SO += libnss_{compat,db,dns,files,hesiod,nis,nisplus}{-*.so,.so.*}
+#LIBC_SO += lib{thread_db,anl,BrokenLocale,cidn}{-*.so,.so.*}
+
+initramfs_rootfs:
+	$(MKDIR) $(ROOTFS)/{lib,dev,proc,sys,var,mnt}
+	$(CP) $(addprefix $(LIBC_SO_PATH)/,$(LIBC_SO)) $(ROOTFS)/lib
+	$(CP) $(DESTDIR)/{etc,bin,sbin,usr} $(ROOTFS)
+ifneq ("$(wildcard $(DESTDIR)/init)","")
+	$(CP) $(DESTDIR)/init $(ROOTFS)
+endif # init
+ifneq ("$(wildcard $(DESTDIR)/linuxrc)","")
+	$(CP) $(DESTDIR)/linuxrc $(ROOTFS)
+endif # init
+ifneq ("$(wildcard $(DESTDIR)/lib/*)","")
+	$(CP) $(DESTDIR)/lib/*{-*.so,.so.*} $(ROOTFS)/lib
+endif # $(DESTDIR)/lib
 
 #------------------------------------
 #
