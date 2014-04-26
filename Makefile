@@ -134,7 +134,6 @@ LIBC_SO += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
 #LIBC_SO += libmemusage.so libpcprofile.so libSegFault.so
 #LIBC_SO += libnss_{compat,db,dns,files,hesiod,nis,nisplus}{-*.so,.so.*}
 #LIBC_SO += lib{thread_db,anl,BrokenLocale,cidn}{-*.so,.so.*}
-
 initramfs_rootfs:
 	$(MKDIR) $(ROOTFS)/{lib,dev,proc,sys,var,mnt}
 	$(CP) $(addprefix $(LIBC_SO_PATH)/,$(LIBC_SO)) $(ROOTFS)/lib
@@ -148,6 +147,15 @@ endif # init
 ifneq ("$(wildcard $(DESTDIR)/lib/*)","")
 	$(CP) $(DESTDIR)/lib/*{-*.so,.so.*} $(ROOTFS)/lib
 endif # $(DESTDIR)/lib
+
+GETPASS = $(shell openssl passwd -1 -salt xxxxxxxx $(1))
+# login,pass,uid,gid,home
+PASSWD = $(1):$(2):$(3):$(4):$(1):$(5):/bin/sh
+# login,pass
+SHADOW = $(1):$(2):$(EPOCHDAY):0:99999::::
+passwd:
+	@echo '$(call PASSWD,root,x,0,0,/)' > passwd
+	@echo '$(call SHADOW,root,$(call GETPASS))' > shadow
 
 #------------------------------------
 #

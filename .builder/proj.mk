@@ -52,7 +52,6 @@ COLOR_MAGENTA = $(call _COLOR,35)
 COLOR_CYAN = $(call _COLOR,36)
 COLOR_LIGHTGRAY = $(call _COLOR,37)
 
-
 #------------------------------------
 #
 CFLAGS = -I$(PWD)/include -I$(PROJDIR)/include -I$(DESTDIR)/include
@@ -68,10 +67,6 @@ MAKEPARAM = BUILDERDIR="$(BUILDERDIR)" PROJDIR="$(PROJDIR)"
 MAKEPARAM += DESTDIR="$(DESTDIR)" 
 
 #------------------------------------
-#
-HOST = $(shell PATH=$(PATH) && $(or $(1),$(CC)) -dumpmachine)
-
-#------------------------------------
 # $(info CONCAT,.,1, -> $(call CONCAT,.,1,)) 
 # $(info CONCAT,.,1,2,3 -> $(call CONCAT,.,1,2,3)) 
 #
@@ -81,7 +76,6 @@ CONCAT = $(if $(2),$(if $(3),$(2)$(1)$(call CONCAT,$(1),$(3),$(4),$(5),$(6),$(7)
 #
 SONAME = $(call CONCAT,.,lib$(or $($(1)_NAME),$(1)).so,$($(1)_MAJOR))
 LIBNAME = $(call CONCAT,.,lib$(or $($(1)_NAME),$(1)).so,$($(1)_MAJOR),$($(1)_MINOR),$($(1)_RELEASE))
-
 
 #------------------------------------
 # filter only existed wildcard
@@ -94,6 +88,15 @@ OVERWRITE = rsync -rl --progress
 OVERWRITE += $(if $(3),$(foreach ex,$(3),-f "- $(ex)"))
 OVERWRITE += $(call FILTER_EXIST,$(addsuffix /.[!.]*,$(2)) $(addsuffix /*,$(2)))
 OVERWRITE += $(1)
+
+#------------------------------------
+# $(info *** to day passed since epoch: $(EPOCHDAY))
+#
+EPOCHDAY = $(shell echo $$(( `date +%s` / 86400)))
+
+#------------------------------------
+#
+HOST = $(shell PATH=$(PATH) && $(or $(1),$(CC)) -dumpmachine)
 
 #------------------------------------
 #

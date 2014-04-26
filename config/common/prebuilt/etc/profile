@@ -1,7 +1,5 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
-
-TZ_FILE=/etc/TZ
-[ -f $TZ_FILE ] && TZ=`cat $TZ_FILE`
+[ -f /etc/TZ ] && TZ=`/etc/TZ`
 
 export PATH
 export TZ

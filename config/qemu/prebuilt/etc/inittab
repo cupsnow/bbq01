@@ -1,10 +1,7 @@
-# system initialisation
 ::sysinit:/etc/rc.d/startup
 
-# run gettys on the serial ports
-::respawn:/sbin/getty -n -l /bin/sh -L 57600 ttyAMA0 vt100
 # ::respawn:/bin/sh
+::respawn:/sbin/getty -n -l /bin/sh -L 57600 ttyAMA0 vt100
 
-# stuff to do before rebooting
 ::ctrlaltdel:/sbin/reboot
 ::shutdown:/etc/rc.d/shutdown

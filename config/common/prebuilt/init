@@ -1,19 +1,16 @@
 #!/bin/sh
 
-/bin/mount -t proc none /proc
-/bin/mount -t sysfs sysfs /sys
+cat <<'BannerEOF'
+ _     _           _     _                  
+| |__ | |__   __ _| |   (_)_ __  _   ___  __
+| '_ \| '_ \ / _` | |   | | '_ \| | | \ \/ /
+| |_) | |_) | (_| | |___| | | | | |_| |>  < 
+|_.__/|_.__/ \__, |_____|_|_| |_|\__,_/_/\_\
+                |_|                         
+BannerEOF
 
-cat <<'EOF'
-     _            _     _                  
-    | | ___   ___| |   (_)_ __  _   ___  __
- _  | |/ _ \ / _ \ |   | | '_ \| | | \ \/ /
-| |_| | (_) |  __/ |___| | | | | |_| |>  < 
- \___/ \___/ \___|_____|_|_| |_|\__,_/_/\_\
+# login machine
+[ -x /linuxrc ] && /linuxrc
 
-EOF
-echo 'Enjoy your new system!'
-
-if [ -x /linuxrc ]; then
-  /linuxrc
-fi
+# fallback to shell
 /bin/sh
