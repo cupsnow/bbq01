@@ -148,15 +148,6 @@ ifneq ("$(wildcard $(DESTDIR)/lib/*)","")
 	$(CP) $(DESTDIR)/lib/*{-*.so,.so.*} $(ROOTFS)/lib
 endif # $(DESTDIR)/lib
 
-GETPASS = $(shell openssl passwd -1 -salt xxxxxxxx $(1))
-# login,pass,uid,gid,home
-PASSWD = $(1):$(2):$(3):$(4):$(1):$(5):/bin/sh
-# login,pass
-SHADOW = $(1):$(2):$(EPOCHDAY):0:99999::::
-passwd:
-	@echo '$(call PASSWD,root,x,0,0,/)' > passwd
-	@echo '$(call SHADOW,root,$(call GETPASS))' > shadow
-
 #------------------------------------
 #
 .PHONY: package install release build test tool
