@@ -9,13 +9,14 @@ TOOLCHAIN ?= $(patsubst %/bin/$(CROSS_COMPILE)gcc,%,$(SEARCH_COMPILE))
 MYPATH = $(PROJDIR)/tool/bin:$(TOOLCHAIN)/bin
 SHELL := /bin/bash
 
-BOARD = qemu
+# qemu bb
+BOARD = bb
 
 export PATH := $(MYPATH)$(PATH:%=:)$(PATH)
 
 #------------------------------------
 #
-all : ;
+all: ;
 
 #------------------------------------
 # bootloader
@@ -33,6 +34,15 @@ uboot_qemu_config:
 	$(call OVERWRITE,$(uboot_DIR),config/qemu/u-boot,.svn)
 	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
 	  versatileqemu_config
+
+uboot_bb_defconfig:
+	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
+	  omap3_beagle_config
+
+uboot_bb_config:
+	$(call OVERWRITE,$(uboot_DIR),config/bb/u-boot,.svn)
+	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
+	  omap3_beagle_config
 
 uboot_clean uboot_distclean:
 	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
@@ -64,6 +74,16 @@ linux_qemu_defconfig:
 
 linux_qemu_config:
 	$(call OVERWRITE,$(linux_DIR),config/qemu/linux,.svn)
+	$(MAKE) linux_oldconfig linux_prepare
+
+linux_bb_LOADADDR = 0x80008000
+
+linux_bb_defconfig:
+	$(linux_MAKEENV) $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR) \
+	  omap2plus_defconfig
+
+linux_bb_config:
+	$(call OVERWRITE,$(linux_DIR),config/bb/linux,.svn)
 	$(MAKE) linux_oldconfig linux_prepare
 
 linux_clean linux_distclean:
@@ -111,7 +131,7 @@ busybox busybox_%: | $(busybox_DIR)/.config
 #
 initramfs:
 	$(MAKE) linux_headers_install
-	$(MAKE) linux busybox_install
+	$(MAKE) uboot linux busybox_install
 	$(MAKE) initramfs_prebuilt
 	$(MAKE) initramfs_rootfs
 	$(MAKE) initramfs_uImage
@@ -147,6 +167,19 @@ endif # init
 ifneq ("$(wildcard $(DESTDIR)/lib/*)","")
 	$(CP) $(DESTDIR)/lib/*{-*.so,.so.*} $(ROOTFS)/lib
 endif # $(DESTDIR)/lib
+
+#------------------------------------
+#
+release: release_$(BOARD)
+
+release_bb:
+	$(MKDIR) $(RELEASE)
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage $(RELEASE)
+	$(CP) $(uboot_DIR)/{u-boot.img,MLO} $(RELEASE)
+
+release_qemu:
+	$(MKDIR) $(RELEASE)
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage $(RELEASE)
 
 #------------------------------------
 #

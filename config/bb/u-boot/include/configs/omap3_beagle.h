@@ -192,6 +192,21 @@
 /* Environment information */
 #define CONFIG_BOOTDELAY		3
 
+#if 1
+#define CONFIG_EXTRA_ENV_SETTINGS \
+	"loadaddr=0x80200000\0" \
+	"bootfile=/uImage\0" \
+	"bootargs=console=ttyO2,115200n8\0" \
+	"\0"
+
+#define CONFIG_BOOTCOMMAND \
+	"mmc dev 0; mmc rescan; " \
+	  "fatload mmc 0:1 ${loadaddr} ${bootfile}; " \
+	  "bootm ${loadaddr}; " \
+	""
+
+#else
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"loadaddr=0x80200000\0" \
 	"rdaddr=0x81000000\0" \
@@ -309,6 +324,8 @@
 		"run loadfdt;" \
 		"run mmcbootz; " \
 	"fi; " \
+
+#endif
 
 #define CONFIG_AUTO_COMPLETE		1
 /*
