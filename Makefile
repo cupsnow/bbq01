@@ -2,6 +2,12 @@
 BUILDERDIR := $(abspath .)/.builder
 include $(BUILDERDIR)/proj.mk
 
+ifeq ("$(wildcard config.mk)","")
+  $(error Please execute ./configure before build project)
+endif
+
+-include config.mk 
+
 SEARCH_COMPILE ?= $(firstword $(wildcard $(PROJDIR)/tool/toolchain/bin/*gcc))
 CROSS_COMPILE ?= $(patsubst %gcc,%,$(notdir $(SEARCH_COMPILE)))
 TOOLCHAIN ?= $(patsubst %/bin/$(CROSS_COMPILE)gcc,%,$(SEARCH_COMPILE))
@@ -9,14 +15,12 @@ TOOLCHAIN ?= $(patsubst %/bin/$(CROSS_COMPILE)gcc,%,$(SEARCH_COMPILE))
 MYPATH = $(PROJDIR)/tool/bin:$(TOOLCHAIN)/bin
 SHELL := /bin/bash
 
-# qemu bb
-BOARD = bb
-
 export PATH := $(MYPATH)$(PATH:%=:)$(PATH)
 
 #------------------------------------
 #
-all: ;
+all:
+	@echo "Please select other goals" 
 
 #------------------------------------
 # bootloader
@@ -183,4 +187,4 @@ release_qemu:
 
 #------------------------------------
 #
-.PHONY: package install release build test tool
+.PHONY: package install release build test tool config

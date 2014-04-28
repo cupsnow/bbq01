@@ -1,0 +1,22 @@
+* Extract the following package
+  ** package/busybox
+       http://www.busybox.net/downloads/busybox-1.21.1.tar.bz2
+
+  ** package/linux
+       https://www.kernel.org/pub/linux/kernel/v3.x/linux-3.12.6.tar.xz
+
+  ** package/u-boot
+       ftp://ftp.denx.de/pub/u-boot/u-boot-2013.10.tar.bz2
+
+* Configure for qemu simulator
+    ./configure --board=qemu
+
+* Configure for beagleboard
+    ./configure --board=bb
+
+* Build
+    make initramfs
+
+* Run Simulator
+   ./sim.sh
+

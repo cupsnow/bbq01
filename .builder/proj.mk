@@ -110,6 +110,6 @@ endef # OBJFROM_C_CPP
 
 #------------------------------------
 #
-$(info *** PWD: $(PWD))
+$(info *** [$(MAKELEVEL)] PWD: $(PWD))
 $(info *** [$(MAKELEVEL)] MAKECMDGOALS: $(MAKECMDGOALS))
 $(info ***)
