@@ -5,14 +5,13 @@ include $(BUILDERDIR)/proj.mk
 ifeq ("$(wildcard config.mk)","")
   $(error Please execute ./configure before build project)
 endif
-
--include config.mk 
+include config.mk
 
 SEARCH_COMPILE ?= $(firstword $(wildcard $(PROJDIR)/tool/toolchain/bin/*gcc))
 CROSS_COMPILE ?= $(patsubst %gcc,%,$(notdir $(SEARCH_COMPILE)))
 TOOLCHAIN ?= $(patsubst %/bin/$(CROSS_COMPILE)gcc,%,$(SEARCH_COMPILE))
 
-MYPATH = $(PROJDIR)/tool/bin:$(TOOLCHAIN)/bin
+MYPATH = $(PROJDIR)/package/u-boot/tools:$(PROJDIR)/tool/bin:$(TOOLCHAIN)/bin
 SHELL := /bin/bash
 
 export PATH := $(MYPATH)$(PATH:%=:)$(PATH)
@@ -64,7 +63,8 @@ uboot uboot_%: | $(uboot_DIR)/include/config.h
 #
 linux_DIR = $(PWD)/package/linux
 linux_MAKEPARAM += ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE)
-linux_MAKEPARAM += INSTALL_HDR_PATH="$(DESTDIR)"
+linux_MAKEPARAM += INSTALL_HDR_PATH="$(or $(INSTALL_HDR_PATH),$(DESTDIR))"
+linux_MAKEPARAM += INSTALL_MOD_PATH="$(or $(INSTALL_MOD_PATH),$(DESTDIR))"
 linux_MAKEPARAM += LOADADDR=$(linux_$(BOARD)_LOADADDR)
 linux_MAKEPARAM += CONFIG_INITRAMFS_SOURCE="$(CONFIG_INITRAMFS_SOURCE)"
 
@@ -106,7 +106,7 @@ linux linux_%: | $(linux_DIR)/.config
 #
 busybox_DIR = $(PWD)/package/busybox
 busybox_MAKEPARAM += CROSS_COMPILE=$(CROSS_COMPILE)
-busybox_MAKEPARAM += CONFIG_PREFIX="$(DESTDIR)"
+busybox_MAKEPARAM += CONFIG_PREFIX="$(or $(CONFIG_PREFIX),$(DESTDIR))"
 busybox_MAKEPARAM += EXTRA_CFLAGS="-I$(DESTDIR)/include"
 
 busybox_%: busybox_$(BOARD)_%;
@@ -131,26 +131,16 @@ busybox busybox_%: | $(busybox_DIR)/.config
 	  $(patsubst busybox,,$(@:busybox_%=%))
 
 #------------------------------------
-# initramfs
 #
-initramfs:
-	$(MAKE) linux_headers_install
-	$(MAKE) uboot linux busybox_install
-	$(MAKE) initramfs_prebuilt
-	$(MAKE) initramfs_rootfs
-	$(MAKE) initramfs_uImage
+rootfs:
+	$(MAKE) linux_headers_install 
+	$(MAKE) uboot linux busybox
+	$(MAKE) rootfs_package
+	$(MAKE) rootfs_rootfs
+	$(MAKE) rootfs_prebuilt
 
-initramfs_prebuilt:
-ifneq ("$(wildcard $(PROJDIR)/config/common/prebuilt)","")
-	$(CP) $(PROJDIR)/config/common/prebuilt/* $(DESTDIR)
-endif # common
-ifneq ("$(wildcard $(PROJDIR)/config/$(BOARD)/prebuilt)","")
-	$(CP) $(PROJDIR)/config/$(BOARD)/prebuilt/* $(DESTDIR)
-endif # board
+rootfs_package: $(ROOTFS_PACKAGE) ;
 
-initramfs_uImage:
-	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(PROJDIR)/config/common/initramfs_list $(ROOTFS)" linux_uImage
-	
 LIBC_SO_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/lib
 LIBC_SO += ld{-*.so,-*.so.*} 
 LIBC_SO += libgcc_s{.so,.so.*}
@@ -158,19 +148,56 @@ LIBC_SO += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
 #LIBC_SO += libmemusage.so libpcprofile.so libSegFault.so
 #LIBC_SO += libnss_{compat,db,dns,files,hesiod,nis,nisplus}{-*.so,.so.*}
 #LIBC_SO += lib{thread_db,anl,BrokenLocale,cidn}{-*.so,.so.*}
-initramfs_rootfs:
-	$(MKDIR) $(ROOTFS)/{lib,dev,proc,sys,var,mnt}
-	$(CP) $(addprefix $(LIBC_SO_PATH)/,$(LIBC_SO)) $(ROOTFS)/lib
-	$(CP) $(DESTDIR)/{etc,bin,sbin,usr} $(ROOTFS)
-ifneq ("$(wildcard $(DESTDIR)/init)","")
-	$(CP) $(DESTDIR)/init $(ROOTFS)
-endif # init
-ifneq ("$(wildcard $(DESTDIR)/linuxrc)","")
-	$(CP) $(DESTDIR)/linuxrc $(ROOTFS)
-endif # init
-ifneq ("$(wildcard $(DESTDIR)/lib/*)","")
-	$(CP) $(DESTDIR)/lib/*{-*.so,.so.*} $(ROOTFS)/lib
-endif # $(DESTDIR)/lib
+
+rootfs_rootfs:
+	$(MKDIR) $(ROOTFSDIR)/{lib,dev,proc,sys,var,mnt}
+	$(MAKE) CONFIG_PREFIX=$(ROOTFSDIR) busybox_install
+	$(CP) $(addprefix $(LIBC_SO_PATH)/,$(LIBC_SO)) $(ROOTFSDIR)/lib
+	$(if $(wildcard $(DESTDIR)/bin),$(CP) $(DESTDIR)/bin $(ROOTFSDIR))
+	$(if $(wildcard $(DESTDIR)/sbin),$(CP) $(DESTDIR)/sbin $(ROOTFSDIR))
+	$(if $(wildcard $(DESTDIR)/usr),$(CP) $(DESTDIR)/usr $(ROOTFSDIR))
+	$(if $(wildcard $(DESTDIR)/etc),$(CP) $(DESTDIR)/etc $(ROOTFSDIR))
+	$(if $(wildcard $(DESTDIR)/init),$(CP) $(DESTDIR)/init $(ROOTFSDIR))
+	$(if $(wildcard $(DESTDIR)/linuxrc),$(CP) $(DESTDIR)/linuxrc $(ROOTFSDIR))
+ifneq ("$(wildcard $(DESTDIR)/lib/*{-*.so,.so.*})","")
+	$(CP) $(DESTDIR)/lib/*{-*.so,.so.*} $(ROOTFSDIR)/lib
+endif
+
+rootfs_prebuilt:
+	$(MKDIR) $(or $(ROOTFSDIR),$(DESTDIR))
+ifneq ("$(wildcard $(PROJDIR)/config/common/prebuilt)","")
+	$(CP) $(PROJDIR)/config/common/prebuilt/* $(ROOTFSDIR)
+endif # common
+ifneq ("$(wildcard $(PROJDIR)/config/$(BOARD)/prebuilt)","")
+	$(CP) $(PROJDIR)/config/$(BOARD)/prebuilt/* $(ROOTFSDIR)
+endif # board
+
+#------------------------------------
+# initramfs
+#
+initramfs:
+	$(MAKE) ROOTFSDIR=$(INITRAMFS) rootfs
+	$(MAKE) initramfs_image
+
+
+initramfs_SRC = $(PROJDIR)/config/common/initramfs_list
+initramfs_SRC += $(INITRAMFS) 
+
+initramfs_image:
+	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(initramfs_SRC)" linux_uImage
+
+#------------------------------------
+# work
+#
+work:
+	$(MAKE) ROOTFSDIR=$(ROOTFS) ROOTFS_PACKAGE=work_package rootfs
+	$(MAKE) wrok_image
+
+work_package:
+
+
+wrok_image:
+
 
 #------------------------------------
 #

@@ -21,6 +21,7 @@ BUILDDIR ?= $(PROJDIR)/build
 DESTDIR ?= $(BUILDDIR)/buildtime
 
 # runtime rootfs
+INITRAMFS ?= $(BUILDDIR)/initramfs
 ROOTFS ?= $(BUILDDIR)/rootfs
 
 # binary/image/managed data for release

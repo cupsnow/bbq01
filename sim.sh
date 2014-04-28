@@ -10,4 +10,3 @@ echo .
 qemu-system-arm -m 256 -M versatilepb -nographic \
   -kernel package/linux/arch/arm/boot/uImage \
   -append 'root=/dev/ram console=ttyAMA0'
-
