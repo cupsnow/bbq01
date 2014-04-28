@@ -8,15 +8,14 @@
   ** package/u-boot
        ftp://ftp.denx.de/pub/u-boot/u-boot-2013.10.tar.bz2
 
-* Configure for qemu simulator
+* Build project for qemu simulator
     ./configure --board=qemu
-
-* Configure for beagleboard
-    ./configure --board=bb
-
-* Build
+    make uboot_config linux_config busybox_config 
     make initramfs
-
-* Run Simulator
    ./sim.sh
 
+* Build project for beagleboard
+    ./configure --board=bb
+    make uboot_config linux_config busybox_config 
+    make initramfs
+    make release
