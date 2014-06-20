@@ -197,7 +197,8 @@ work_package:
 
 
 wrok_image:
-
+	$(MKDIR) $(RELEASE)
+	mksquashfs $(ROOTFS) $(RELEASE)/rootfs.img
 
 #------------------------------------
 #

@@ -7,6 +7,9 @@ echo "C-a h    print this help"
 echo "C-a x    exit emulator"
 echo .
 
-qemu-system-arm -m 256 -M versatilepb -nographic \
-  -kernel package/linux/arch/arm/boot/uImage \
-  -append 'root=/dev/ram console=ttyAMA0'
+board="-m 256 -M versatilepb -nographic"
+kernel="-kernel package/linux/arch/arm/boot/uImage"
+disk="-drive file=release/rootfs.img,media=disk"
+bootargs="-append 'root=/dev/ram console=ttyAMA0'"
+
+eval "qemu-system-arm $board $kernel $disk $bootargs"
