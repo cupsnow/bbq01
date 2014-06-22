@@ -6,20 +6,26 @@ help() {
 cat <<EOF
   USAGE
     $0 [OPTION]
-  
+
   OPTION
-    -h, --help           show this help
-    -b, --board=[BOARD]  choose system [*qemu, bb]
+    -h, --help           Show this help
+    -b, --board=[BOARD]  Choose system [$BOARD]
+
+  BOARD
+    qemu   For qemu arm simultor
+    bb     For beagleboard xm
 
 EOF
 }
 
-log_debug "start parse argument"
-arg=
+# LOG_LEVEL=3 # available max log level, 3: debug, 2: info
+
+log_debug "Start parse option"
+parse_arg=
 for i in $@; do
-  if [ -n "$arg" ]; then
-    log_verbose "$arg argument $i"
-    opt=$arg
+  if [ -n "$parse_arg" ]; then
+    log_verbose "Of option: $parse_arg, Argument: $i"
+    opt=$parse_arg
     arg=$i
   else
     opt=$i
@@ -30,22 +36,26 @@ for i in $@; do
     help $0
     exit 0
     ;;
-  -b | --board)
-    if [ -n "$arg" ]; then
-      board=$arg
-      arg=
+  -b)
+    if [ -n "$parse_arg" ]; then
+      BOARD=$arg
+      parse_arg=
     else
-      arg=$opt
+      parse_arg=$opt
     fi
     ;;
+  --board=*)
+    BOARD=${opt#--board=}
+    ;;
   *)
-    log_error "unknown argument $opt" 
+    log_error "Unknown argument $opt" 
     exit 1
     ;;
   esac
 done
 
+# empty config.mk
 echo -n "" > config.mk
 
-log_info "set BOARD=$BOARD"
+log_info "Set BOARD=$BOARD"
 echo "BOARD=$BOARD" >> config.mk

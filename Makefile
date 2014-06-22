@@ -11,10 +11,12 @@ SEARCH_COMPILE ?= $(firstword $(wildcard $(PROJDIR)/tool/toolchain/bin/*gcc))
 CROSS_COMPILE ?= $(patsubst %gcc,%,$(notdir $(SEARCH_COMPILE)))
 TOOLCHAIN ?= $(patsubst %/bin/$(CROSS_COMPILE)gcc,%,$(SEARCH_COMPILE))
 
-MYPATH = $(PROJDIR)/package/u-boot/tools:$(PROJDIR)/tool/bin:$(TOOLCHAIN)/bin
+MYPATH = $(PROJDIR)/package/u-boot/tools
+MYPATH += $(TOOLCHAIN)/bin
+MYPATH += $(PROJDIR)/tool/bin
 SHELL := /bin/bash
 
-export PATH := $(MYPATH)$(PATH:%=:)$(PATH)
+export PATH := $(subst $(SPACE),:,$(MYPATH))$(PATH:%=:)$(PATH)
 
 #------------------------------------
 #
@@ -131,73 +133,72 @@ busybox busybox_%: | $(busybox_DIR)/.config
 	  $(patsubst busybox,,$(@:busybox_%=%))
 
 #------------------------------------
-#
-rootfs:
-	$(MAKE) linux_headers_install 
-	$(MAKE) uboot linux busybox
-	$(MAKE) rootfs_package
-	$(MAKE) rootfs_rootfs
-	$(MAKE) rootfs_prebuilt
-
-rootfs_package: $(ROOTFS_PACKAGE) ;
-
-LIBC_SO_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/lib
-LIBC_SO += ld{-*.so,-*.so.*} 
-LIBC_SO += libgcc_s{.so,.so.*}
-LIBC_SO += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
-#LIBC_SO += libmemusage.so libpcprofile.so libSegFault.so
-#LIBC_SO += libnss_{compat,db,dns,files,hesiod,nis,nisplus}{-*.so,.so.*}
-#LIBC_SO += lib{thread_db,anl,BrokenLocale,cidn}{-*.so,.so.*}
-
-rootfs_rootfs:
-	$(MKDIR) $(ROOTFSDIR)/{lib,dev,proc,sys,var,mnt}
-	$(MAKE) CONFIG_PREFIX=$(ROOTFSDIR) busybox_install
-	$(CP) $(addprefix $(LIBC_SO_PATH)/,$(LIBC_SO)) $(ROOTFSDIR)/lib
-	$(if $(wildcard $(DESTDIR)/bin),$(CP) $(DESTDIR)/bin $(ROOTFSDIR))
-	$(if $(wildcard $(DESTDIR)/sbin),$(CP) $(DESTDIR)/sbin $(ROOTFSDIR))
-	$(if $(wildcard $(DESTDIR)/usr),$(CP) $(DESTDIR)/usr $(ROOTFSDIR))
-	$(if $(wildcard $(DESTDIR)/etc),$(CP) $(DESTDIR)/etc $(ROOTFSDIR))
-	$(if $(wildcard $(DESTDIR)/init),$(CP) $(DESTDIR)/init $(ROOTFSDIR))
-	$(if $(wildcard $(DESTDIR)/linuxrc),$(CP) $(DESTDIR)/linuxrc $(ROOTFSDIR))
-ifneq ("$(wildcard $(DESTDIR)/lib/*{-*.so,.so.*})","")
-	$(CP) $(DESTDIR)/lib/*{-*.so,.so.*} $(ROOTFSDIR)/lib
-endif
-
-rootfs_prebuilt:
-	$(MKDIR) $(or $(ROOTFSDIR),$(DESTDIR))
-ifneq ("$(wildcard $(PROJDIR)/config/common/prebuilt)","")
-	$(CP) $(PROJDIR)/config/common/prebuilt/* $(ROOTFSDIR)
-endif # common
-ifneq ("$(wildcard $(PROJDIR)/config/$(BOARD)/prebuilt)","")
-	$(CP) $(PROJDIR)/config/$(BOARD)/prebuilt/* $(ROOTFSDIR)
-endif # board
-
-#------------------------------------
 # initramfs
 #
 initramfs:
-	$(MAKE) ROOTFSDIR=$(INITRAMFS) rootfs
+	$(MAKE) linux linux_headers_install uboot
+	$(MAKE) busybox
+	$(MAKE) busybox_install
+	$(MAKE) initramfs_libc
+	$(MAKE) initramfs_destdir
+	$(MAKE) initramfs_prebuilt
 	$(MAKE) initramfs_image
 
+initramfs_LIBC_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/lib
+initramfs_LIBC += ld{-*.so,-*.so.*} 
+initramfs_LIBC += libgcc_s{.so,.so.*}
+initramfs_LIBC += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
+initramfs_libc:
+	$(MKDIR) $(INITRAMFS)/{lib,usr/lib}
+	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(INITRAMFS)/lib
 
-initramfs_SRC = $(PROJDIR)/config/common/initramfs_list
-initramfs_SRC += $(INITRAMFS) 
+initramfs_DESTDIR = bin sbin usr etc init linuxrc 
+initramfs_DESTDIR += lib/*-*.so lib/*.so.* lib/*.so
+initramfs_destdir:
+	$(MKDIR) $(INITRAMFS)/{dev,proc,sys,var,mnt,lib}
+	$(foreach i,$(initramfs_DESTDIR),$(if $(wildcard $(DESTDIR)/$(i)),$(CP) $(DESTDIR)/$(i) $(INITRAMFS)/$(dir $(i));))
 
+initramfs_PREBUILT = config/common/prebuilt config/$(BOARD)/prebuilt
+initramfs_prebuilt:
+	$(foreach i,$(initramfs_PREBUILT),$(if $(wildcard $(i)),$(CP) $(i)/* $(INITRAMFS);))
+
+initramfs_IMAGE = $(PROJDIR)/config/common/initramfs_list
+initramfs_IMAGE += $(INITRAMFS) 
 initramfs_image:
-	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(initramfs_SRC)" linux_uImage
+	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(initramfs_IMAGE)" linux_uImage
 
 #------------------------------------
-# work
+# rootfs
 #
-work:
-	$(MAKE) ROOTFSDIR=$(ROOTFS) ROOTFS_PACKAGE=work_package rootfs
-	$(MAKE) wrok_image
+rootfs:
+	$(MAKE) linux_headers_install
+	$(MAKE) busybox
+	$(MAKE) busybox_install
+	$(MAKE) rootfs_libc
+	$(MAKE) rootfs_package
+	$(MAKE) rootfs_destdir
+	$(MAKE) rootfs_prebuilt
+	$(MAKE) rootfs_image
 
-work_package:
+rootfs_libc:
+	$(MKDIR) $(ROOTFS)/{lib,usr/lib}
+	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(ROOTFS)/lib
 
+rootfs_package: ;
 
-wrok_image:
+rootfs_DESTDIR = bin sbin usr etc init 
+rootfs_DESTDIR += lib/*-*.so lib/*.so.* lib/*.so
+rootfs_destdir:
+	$(MKDIR) $(ROOTFS)/{dev,proc,sys,var,mnt,lib}
+	$(foreach i,$(rootfs_DESTDIR),$(if $(wildcard $(DESTDIR)/$(i)),$(CP) $(DESTDIR)/$(i) $(ROOTFS)/$(dir $(i));))
+
+rootfs_PREBUILT = config/common/prebuilt config/$(BOARD)/prebuilt
+rootfs_prebuilt:
+	$(foreach i,$(rootfs_PREBUILT),$(if $(wildcard $(i)),$(CP) $(i)/* $(ROOTFS);))
+
+rootfs_image:
 	$(MKDIR) $(RELEASE)
+	$(RM) $(RELEASE)/rootfs.img
 	mksquashfs $(ROOTFS) $(RELEASE)/rootfs.img
 
 #------------------------------------

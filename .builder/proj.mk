@@ -41,6 +41,11 @@ MKDIR = mkdir -p
 RM = rm -rf
 
 #------------------------------------
+#
+EMPTY :=# trailing for empty
+SPACE := $(EMPTY) $(EMPTY)
+
+#------------------------------------
 # @echo -e "color: $(COLOR_RED)red$(COLOR)"
 #
 _COLOR = \033[$(1)m
