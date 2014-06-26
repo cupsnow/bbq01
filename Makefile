@@ -231,6 +231,36 @@ rootfs_package: libevent_install
 
 #------------------------------------
 #
+directfb_DIR = package/directfb
+directfb_MAKEPARAM = DESTDIR=$(DESTDIR)
+
+directfb_clean directfb_distclean: ;
+ifneq ("$(wildcard $(directfb_DIR)/Makefile)","")
+	$(directfb_MAKEENV) $(MAKE) $(directfb_MAKEPARAM) \
+	  -C $(directfb_DIR) $(patsubst directfb,,$(@:directfb_%=%))
+endif
+
+directfb_config:
+	cd $(directfb_DIR) && \
+	  ./configure --host=$(HOST) --prefix=/ \
+	    --disable-multi-kernel --disable-x11 --with-gfxdrivers=none \
+	    --with-inputdrivers=keyboard,linuxinput,ps2mouse
+	    
+
+$(directfb_DIR)/Makefile:
+	$(MAKE) directfb_config
+	
+directfb directfb_%: | $(directfb_DIR)/Makefile
+	$(directfb_MAKEENV) $(MAKE) $(directfb_MAKEPARAM) \
+	  -C $(directfb_DIR) $(patsubst directfb,,$(@:directfb_%=%))
+
+$(DESTDIR)/lib/directfb.so:
+	$(MAKE) directfb_install
+ 
+rootfs_package: directfb_install
+
+#------------------------------------
+#
 sample01_DIR = package/sample01
 sample01_MAKEPARAM = $(MAKEPARAM)
 
