@@ -148,6 +148,8 @@ initramfs_LIBC_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/lib
 initramfs_LIBC += ld{-*.so,-*.so.*} 
 initramfs_LIBC += libgcc_s{.so,.so.*}
 initramfs_LIBC += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
+initramfs_LIBC2_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/usr/lib
+initramfs_LIBC2 += libstdc++{.so,.so.*} 
 initramfs_libc:
 	$(MKDIR) $(INITRAMFS)/lib
 	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(INITRAMFS)/lib
@@ -184,6 +186,7 @@ rootfs:
 rootfs_libc:
 	$(MKDIR) $(ROOTFS)/lib
 	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(ROOTFS)/lib
+	$(CP) $(addprefix $(initramfs_LIBC2_PATH)/,$(initramfs_LIBC2)) $(ROOTFS)/lib
 
 rootfs_package: ;
 

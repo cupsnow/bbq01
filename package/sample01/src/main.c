@@ -56,7 +56,7 @@ static int cmdline(int argc, char **argv)
 		{""},
 	};
 
-	while((op = getopt_long(argc, argv, "-hef", longopts, &idx)) != -1) {
+	while((op = getopt_long(argc, argv, "-hefd", longopts, &idx)) != -1) {
 		switch(op) {
 		case 'h':
 			return 1;
