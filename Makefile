@@ -204,6 +204,44 @@ rootfs_image:
 
 #------------------------------------
 #
+libevent_DIR = package/libevent
+libevent_MAKEPARAM = DESTDIR=$(DESTDIR)
+
+libevent_clean libevent_distclean: ;
+ifneq ("$(wildcard $(libevent_DIR)/Makefile)","")
+	$(libevent_MAKEENV) $(MAKE) $(libevent_MAKEPARAM) \
+	  -C $(libevent_DIR) $(patsubst libevent,,$(@:libevent_%=%))
+endif
+
+libevent_config:
+	cd $(libevent_DIR) && \
+	  ./configure --host=$(HOST) --prefix=/
+
+$(libevent_DIR)/Makefile:
+	$(MAKE) libevent_config
+	
+libevent libevent_%: | $(libevent_DIR)/Makefile
+	$(libevent_MAKEENV) $(MAKE) $(libevent_MAKEPARAM) \
+	  -C $(libevent_DIR) $(patsubst libevent,,$(@:libevent_%=%))
+
+$(DESTDIR)/lib/libevent.so:
+	$(MAKE) libevent_install
+ 
+rootfs_package: libevent_install
+
+#------------------------------------
+#
+sample01_DIR = package/sample01
+sample01_MAKEPARAM = $(MAKEPARAM)
+
+sample01 sample01_%: $(DESTDIR)/lib/libevent.so
+	$(MAKE) $(sample01_MAKEPARAM) \
+	  -C $(sample01_DIR) $(patsubst sample01,,$(@:sample01_%=%))
+
+rootfs_package: sample01_install
+
+#------------------------------------
+#
 release: release_$(BOARD)
 
 release_bb:
