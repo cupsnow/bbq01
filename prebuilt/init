@@ -1,8 +1,8 @@
 #!/bin/sh
 
-# bring up root
-#
 . /etc/rc.d/init.d/functions
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
 cat <<'BannerEOF'
  _     _           _     _                  

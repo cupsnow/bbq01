@@ -136,7 +136,7 @@ busybox busybox_%: | $(busybox_DIR)/.config
 # initramfs
 #
 initramfs:
-	$(MAKE) linux linux_headers_install uboot
+	$(MAKE) linux_headers_install uboot # linux
 	$(MAKE) busybox
 	$(MAKE) busybox_install
 	$(MAKE) initramfs_libc
@@ -149,20 +149,21 @@ initramfs_LIBC += ld{-*.so,-*.so.*}
 initramfs_LIBC += libgcc_s{.so,.so.*}
 initramfs_LIBC += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
 initramfs_libc:
-	$(MKDIR) $(INITRAMFS)/{lib,usr/lib}
+	$(MKDIR) $(INITRAMFS)/lib
 	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(INITRAMFS)/lib
 
-initramfs_DESTDIR = bin sbin usr etc init linuxrc 
+initramfs_DESTDIR = bin sbin usr
 initramfs_DESTDIR += lib/*-*.so lib/*.so.* lib/*.so
 initramfs_destdir:
-	$(MKDIR) $(INITRAMFS)/{dev,proc,sys,var,mnt,lib}
 	$(foreach i,$(initramfs_DESTDIR),$(if $(wildcard $(DESTDIR)/$(i)),$(CP) $(DESTDIR)/$(i) $(INITRAMFS)/$(dir $(i));))
 
-initramfs_PREBUILT = config/common/prebuilt config/$(BOARD)/prebuilt
+initramfs_PREBUILT = prebuilt/common prebuilt/initramfs config/$(BOARD)/prebuilt/initramfs
 initramfs_prebuilt:
 	$(foreach i,$(initramfs_PREBUILT),$(if $(wildcard $(i)),$(CP) $(i)/* $(INITRAMFS);))
 
-initramfs_IMAGE = $(PROJDIR)/config/common/initramfs_list
+ifneq ("$(wildcard $(PROJDIR)/config/$(BOARD)/initramfs_list)","")
+initramfs_IMAGE += $(PROJDIR)/config/$(BOARD)/initramfs_list
+endif
 initramfs_IMAGE += $(INITRAMFS) 
 initramfs_image:
 	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(initramfs_IMAGE)" linux_uImage
@@ -181,18 +182,18 @@ rootfs:
 	$(MAKE) rootfs_image
 
 rootfs_libc:
-	$(MKDIR) $(ROOTFS)/{lib,usr/lib}
+	$(MKDIR) $(ROOTFS)/lib
 	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(ROOTFS)/lib
 
 rootfs_package: ;
 
-rootfs_DESTDIR = bin sbin usr etc init 
+rootfs_DESTDIR = bin sbin usr etc
 rootfs_DESTDIR += lib/*-*.so lib/*.so.* lib/*.so
 rootfs_destdir:
-	$(MKDIR) $(ROOTFS)/{dev,proc,sys,var,mnt,lib}
+	$(MKDIR) $(ROOTFS)/{dev,proc,sys,lib,var,mnt,tmp}
 	$(foreach i,$(rootfs_DESTDIR),$(if $(wildcard $(DESTDIR)/$(i)),$(CP) $(DESTDIR)/$(i) $(ROOTFS)/$(dir $(i));))
 
-rootfs_PREBUILT = config/common/prebuilt config/$(BOARD)/prebuilt
+rootfs_PREBUILT = prebuilt/common prebuilt/rootfs config/$(BOARD)/prebuilt/rootfs
 rootfs_prebuilt:
 	$(foreach i,$(rootfs_PREBUILT),$(if $(wildcard $(i)),$(CP) $(i)/* $(ROOTFS);))
 
