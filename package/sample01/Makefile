@@ -8,7 +8,7 @@ TOOLCHAIN ?= $(patsubst %/bin/$(CROSS_COMPILE)gcc,%,$(SEARCH_COMPILE))
 NAME = sample01
 WITH_FB = 1
 WITH_EV = 1
-WITH_DFB = 1
+# WITH_DFB = 1
 
 SRC_C = src/main.c
 SRC_CPP = 

@@ -2,19 +2,39 @@
 # $Id$
 # shell utility for builder
 
-# usage
-#   util_cp <dest> <src...> <ex>
-# option
-#   dest  destination directory
-#   src   source directory
-#   ex    exclude file/directory name pattern
-# description
-#   copy recursive from source directory to destination directory and 
-#   bypass any file or directory name to exclude
-# example
-#   util_cp "./runtime" "$dir1 $dir2/*" ".svn .ld .la .a" 
-#     copy $dir1 and $dir2 directory to ./runtime
-#     ignore any file or directory name in .svn, *.ld, *.la or *.a
+UTIL_ANSICOLOR_NORMAL="\033[0m"
+UTIL_ANSICOLOR_RED="\033[31m"
+UTIL_ANSICOLOR_MEGENTA="\033[35m"
+UTIL_ANSICOLOR_CYAN="\033[36m"
+
+util_log() {
+  COLOR=$UTIL_ANSICOLOR_NORMAL
+  LEVEL=""
+
+  LINE=""
+  FUNC=""
+
+  if [ -n "$BASH" ] && [ "$1" -ge "1" ] && [ "$1" -le "4" ]; then
+    FUNC="${FUNCNAME[1]}"
+    LINE="${BASH_LINENO[0]}"
+  fi
+
+  if [ "$1" -eq "1" ]; then
+    LEVEL="ERROR"
+    COLOR=$UTIL_ANSICOLOR_RED
+  elif [ "$1" -eq "2" ]; then
+    LEVEL="INFO"
+    COLOR=$UTIL_ANSICOLOR_MEGENTA
+  elif [ "$1" -eq "3" ]; then
+    LEVEL="Debug"
+    COLOR=$UTIL_ANSICOLOR_CYAN
+  elif [ "$1" -eq "4" ]; then
+    LEVEL="verbose"
+  fi
+  echo -ne "$COLOR"
+  echo "${LEVEL} ${FUNC} #${LINE} $*"
+  echo -ne "$UTIL_ANSICOLOR_NORMAL"
+}
 
 util_cp() {
   DEST=$1
@@ -39,3 +59,6 @@ util_cp() {
   
     
 }
+
+[ -n "$1" ] && $*
+

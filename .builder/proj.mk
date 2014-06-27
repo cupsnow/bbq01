@@ -34,11 +34,13 @@ C++ = $(CROSS_COMPILE)g++
 LD = $(CROSS_COMPILE)ld
 AR = $(CROSS_COMPILE)ar
 OBJCOPY = $(CROSS_COMPILE)objcopy
+STRIP = $(CROSS_COMPILE)strip
 
 INSTALL = install -D
 CP = cp -dpR
 MKDIR = mkdir -p
 RM = rm -rf
+RSYNC = rsync -rl --progress
 
 #------------------------------------
 #
@@ -90,10 +92,7 @@ FILTER_EXIST = $(foreach in,$(1),$(if $(wildcard $(in)),$(in)))
 #------------------------------------
 # $(call OVERWRITE,$(linux_DIR),config/linux,.svn)
 #
-OVERWRITE = rsync -rl --progress
-OVERWRITE += $(if $(3),$(foreach ex,$(3),-f "- $(ex)"))
-OVERWRITE += $(call FILTER_EXIST,$(addsuffix /.[!.]*,$(2)) $(addsuffix /*,$(2)))
-OVERWRITE += $(1)
+OVERWRITE = $(RSYNC) $(if $(3),$(foreach ex,$(3),-f "- $(ex)")) $(call FILTER_EXIST,$(addsuffix /.,$(2))) $(1)
 
 #------------------------------------
 # $(info *** to day passed since epoch: $(EPOCHDAY))

@@ -36,7 +36,7 @@ uboot_qemu_defconfig:
 	  versatileqemu_config
 
 uboot_qemu_config:
-	$(call OVERWRITE,$(uboot_DIR),config/qemu/u-boot,.svn)
+	$(RSYNC) -f "- .svn" config/qemu/u-boot/. $(uboot_DIR)
 	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
 	  versatileqemu_config
 
@@ -45,7 +45,7 @@ uboot_bb_defconfig:
 	  omap3_beagle_config
 
 uboot_bb_config:
-	$(call OVERWRITE,$(uboot_DIR),config/bb/u-boot,.svn)
+	$(RSYNC) -f "- .svn" config/bb/u-boot/. $(uboot_DIR)
 	$(uboot_MAKEENV) $(MAKE) $(uboot_MAKEPARAM) -C $(uboot_DIR) \
 	  omap3_beagle_config
 
@@ -79,7 +79,7 @@ linux_qemu_defconfig:
 	  versatile_defconfig
 
 linux_qemu_config:
-	$(call OVERWRITE,$(linux_DIR),config/qemu/linux,.svn)
+	$(RSYNC) -f "- .svn" config/qemu/linux/. $(linux_DIR)
 	$(MAKE) linux_oldconfig linux_prepare
 
 linux_bb_LOADADDR = 0x80008000
@@ -89,7 +89,7 @@ linux_bb_defconfig:
 	  omap2plus_defconfig
 
 linux_bb_config:
-	$(call OVERWRITE,$(linux_DIR),config/bb/linux,.svn)
+	$(RSYNC) -f "- .svn" config/bb/linux/. $(linux_DIR)
 	$(MAKE) linux_oldconfig linux_prepare
 
 linux_clean linux_distclean:
@@ -118,7 +118,7 @@ busybox_defconfig:
 	  defconfig
 
 busybox_config:
-	$(call OVERWRITE,$(busybox_DIR),config/common/busybox,.svn)
+	$(RSYNC) -f "- .svn" config/busybox/. $(busybox_DIR)
 	$(MAKE) busybox_oldconfig busybox_prepare
 
 busybox_clean busybox_distclean:
@@ -137,36 +137,70 @@ busybox busybox_%: | $(busybox_DIR)/.config
 #
 initramfs:
 	$(MAKE) linux_headers_install uboot # linux
-	$(MAKE) busybox
+	# $(MAKE) busybox
 	$(MAKE) busybox_install
 	$(MAKE) initramfs_libc
-	$(MAKE) initramfs_destdir
 	$(MAKE) initramfs_prebuilt
+	$(MAKE) initramfs_runtime
 	$(MAKE) initramfs_image
 
-initramfs_LIBC_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/lib
-initramfs_LIBC += ld{-*.so,-*.so.*} 
-initramfs_LIBC += libgcc_s{.so,.so.*}
+initramfs_LIBC_PATH = $(TOOLCHAIN)/$(HOST)/libc/lib
+initramfs_LIBC += {ld-*,libgcc_s}.so{,.*}
 initramfs_LIBC += lib{c,crypt,dl,m,rt,util,nsl,pthread,resolv}{-*.so,.so.*}
-initramfs_LIBC2_PATH = $(TOOLCHAIN)/arm-none-linux-gnueabi/libc/usr/lib
-initramfs_LIBC2 += libstdc++{.so,.so.*} 
+initramfs_LIBC++_PATH = $(TOOLCHAIN)/$(HOST)/libc/usr/lib
+initramfs_LIBC++ += libstdc++.so{,.*} 
 initramfs_libc:
-	$(MKDIR) $(INITRAMFS)/lib
-	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(INITRAMFS)/lib
+	$(MKDIR) $(DESTDIR)/lib
+	for i in $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)); do \
+	  if [ -d $$i ]; then \
+	    $(RSYNC) -f "- .svn" $$i/. $(DESTDIR)/lib; \
+	  else \
+	    $(RSYNC) -f "- .svn" $$i $(DESTDIR)/lib; \
+	  fi; \
+	done
 
-initramfs_DESTDIR = bin sbin usr
-initramfs_DESTDIR += lib/*-*.so lib/*.so.* lib/*.so
-initramfs_destdir:
-	$(foreach i,$(initramfs_DESTDIR),$(if $(wildcard $(DESTDIR)/$(i)),$(CP) $(DESTDIR)/$(i) $(INITRAMFS)/$(dir $(i));))
-
-initramfs_PREBUILT = prebuilt/common prebuilt/initramfs config/$(BOARD)/prebuilt/initramfs
+initramfs_PREBUILT = config/$(BOARD)/prebuilt/initramfs 
+initramfs_PREBUILT += prebuilt/common prebuilt/initramfs
 initramfs_prebuilt:
-	$(foreach i,$(initramfs_PREBUILT),$(if $(wildcard $(i)),$(CP) $(i)/* $(INITRAMFS);))
+	$(MKDIR) $(DESTDIR)
+	for i in $(initramfs_PREBUILT); do \
+	  [ ! -e $$i ] && echo "ignore missing prebuilt: $$i"; \
+	  [ ! -e $$i ] && continue; \
+	  if [ -d $$i ]; then \
+	    $(RSYNC) -f "- .svn" $$i/. $(DESTDIR); \
+	  else \
+	    $(RSYNC) -f "- .svn" $$i $(DESTDIR); \
+	  fi; \
+	done
 
+initramfs_RUNTIME = bin etc init lib sbin usr www
+initramfs_RUNTIME_STRIP = bin lib sbin usr/bin usr/lib usr/sbin
+initramfs_runtime:
+	$(MKDIR) $(INITRAMFS)
+	for i in $(addprefix $(DESTDIR)/,$(initramfs_RUNTIME)); do \
+	  [ ! -e $$i ] && echo "ignore missing destdir: $$i"; \
+	  [ ! -e $$i ] && continue; \
+	  $(RSYNC) -f "- .svn" $$i $(INITRAMFS); \
+	done
+	for i in $(addprefix $(INITRAMFS)/,$(initramfs_RUNTIME_STRIP)); do \
+	  [ ! -e $$i ] && echo "ignore missing strip: $$i"; \
+	  [ ! -e $$i ] && continue; \
+	  for j in `find $$i`; do \
+	    file_type=`file $$j`; \
+	    if [ -n "`echo "$$file_type" | grep 'ar archive'`" ]; then \
+	      echo "remove ar archive: $$j"; \
+	      $(RM) $$j; \
+	    elif [ -n "`echo "$$file_type" | grep 'not stripped'`" ]; then \
+	      echo "strip: $$j"; \
+	      $(STRIP) -g $$j; \
+	    fi; \
+	  done \
+	done
+
+initramfs_IMAGE = $(INITRAMFS) 
 ifneq ("$(wildcard $(PROJDIR)/config/$(BOARD)/initramfs_list)","")
 initramfs_IMAGE += $(PROJDIR)/config/$(BOARD)/initramfs_list
 endif
-initramfs_IMAGE += $(INITRAMFS) 
 initramfs_image:
 	$(MAKE) CONFIG_INITRAMFS_SOURCE="$(initramfs_IMAGE)" linux_uImage
 
@@ -175,35 +209,70 @@ initramfs_image:
 #
 rootfs:
 	$(MAKE) linux_headers_install
-	$(MAKE) busybox
+	# $(MAKE) busybox
 	$(MAKE) busybox_install
 	$(MAKE) rootfs_libc
 	$(MAKE) rootfs_package
-	$(MAKE) rootfs_destdir
 	$(MAKE) rootfs_prebuilt
+	$(MAKE) rootfs_runtime
 	$(MAKE) rootfs_image
 
 rootfs_libc:
-	$(MKDIR) $(ROOTFS)/lib
-	$(CP) $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) $(ROOTFS)/lib
-	$(CP) $(addprefix $(initramfs_LIBC2_PATH)/,$(initramfs_LIBC2)) $(ROOTFS)/lib
+	$(MKDIR) $(DESTDIR)/lib
+	for i in $(addprefix $(initramfs_LIBC_PATH)/,$(initramfs_LIBC)) \
+	    $(addprefix $(initramfs_LIBC++_PATH)/,$(initramfs_LIBC++)); do \
+	  if [ -d $$i ]; then \
+	    $(RSYNC) -f "- .svn" $$i/. $(DESTDIR)/lib; \
+	  else \
+	    $(RSYNC) -f "- .svn" $$i $(DESTDIR)/lib; \
+	  fi; \
+	done
 
 rootfs_package: ;
 
-rootfs_DESTDIR = bin sbin usr etc
-rootfs_DESTDIR += lib/*-*.so lib/*.so.* lib/*.so
-rootfs_destdir:
-	$(MKDIR) $(ROOTFS)/{dev,proc,sys,lib,var,mnt,tmp}
-	$(foreach i,$(rootfs_DESTDIR),$(if $(wildcard $(DESTDIR)/$(i)),$(CP) $(DESTDIR)/$(i) $(ROOTFS)/$(dir $(i));))
-
-rootfs_PREBUILT = prebuilt/common prebuilt/rootfs config/$(BOARD)/prebuilt/rootfs
+rootfs_PREBUILT = config/$(BOARD)/prebuilt/rootfs 
+rootfs_PREBUILT += prebuilt/common prebuilt/rootfs
 rootfs_prebuilt:
-	$(foreach i,$(rootfs_PREBUILT),$(if $(wildcard $(i)),$(CP) $(i)/* $(ROOTFS);))
+	$(MKDIR) $(DESTDIR)
+	for i in $(rootfs_PREBUILT); do \
+	  [ ! -e $$i ] && echo "ignore missing prebuilt: $$i"; \
+	  [ ! -e $$i ] && continue; \
+	  if [ -d $$i ]; then \
+	    $(RSYNC) -f "- .svn" $$i/. $(DESTDIR); \
+	  else \
+	    $(RSYNC) -f "- .svn" $$i $(DESTDIR); \
+	  fi; \
+	done
 
+rootfs_RUNTIME = bin dev etc lib linuxrc mnt proc sbin sys tmp usr var www
+rootfs_RUNTIME_STRIP = bin lib linuxrc sbin usr/bin usr/lib usr/sbin
+rootfs_runtime:
+	$(MKDIR) $(ROOTFS)
+	for i in $(addprefix $(DESTDIR)/,$(rootfs_RUNTIME)); do \
+	  [ ! -e $$i ] && echo "ignore missing destdir: $$i"; \
+	  [ ! -e $$i ] && continue; \
+	  $(RSYNC) -f "- .svn" $$i $(ROOTFS); \
+	done
+	for i in $(addprefix $(ROOTFS)/,$(rootfs_RUNTIME_STRIP)); do \
+	  [ ! -e $$i ] && echo "ignore missing strip: $$i"; \
+	  [ ! -e $$i ] && continue; \
+	  for j in `find $$i`; do \
+	    file_type=`file $$j`; \
+	    if [ -n "`echo "$$file_type" | grep 'ar archive'`" ]; then \
+	      echo "remove ar archive: $$j"; \
+	      $(RM) $$j; \
+	    elif [ -n "`echo "$$file_type" | grep 'not stripped'`" ]; then \
+	      echo "strip: $$j"; \
+	      $(STRIP) -g $$j; \
+	    fi; \
+	  done \
+	done
+
+rootfs_IMAGE = $(ROOTFS)
 rootfs_image:
 	$(MKDIR) $(RELEASE)
 	$(RM) $(RELEASE)/rootfs.img
-	mksquashfs $(ROOTFS) $(RELEASE)/rootfs.img
+	mksquashfs $(rootfs_IMAGE) $(RELEASE)/rootfs.img
 
 #------------------------------------
 #
@@ -257,17 +326,44 @@ directfb directfb_%: | $(directfb_DIR)/Makefile
 	$(directfb_MAKEENV) $(MAKE) $(directfb_MAKEPARAM) \
 	  -C $(directfb_DIR) $(patsubst directfb,,$(@:directfb_%=%))
 
-$(DESTDIR)/lib/directfb.so:
+$(DESTDIR)/lib/libdirect.so:
 	$(MAKE) directfb_install
  
-rootfs_package: directfb_install
+#rootfs_package: directfb_install
+
+#------------------------------------
+#
+rsync_DIR = package/rsync
+rsync_MAKEPARAM = DESTDIR=$(DESTDIR)
+
+rsync_clean rsync_distclean: ;
+ifneq ("$(wildcard $(rsync_DIR)/Makefile)","")
+	$(rsync_MAKEENV) $(MAKE) $(rsync_MAKEPARAM) \
+	  -C $(rsync_DIR) $(patsubst rsync,,$(@:rsync_%=%))
+endif
+
+rsync_config:
+	cd $(rsync_DIR) && \
+	  ./configure --host=$(HOST) --prefix=/
+
+$(rsync_DIR)/Makefile:
+	$(MAKE) rsync_config
+	
+rsync rsync_%: | $(rsync_DIR)/Makefile
+	$(rsync_MAKEENV) $(MAKE) $(rsync_MAKEPARAM) \
+	  -C $(rsync_DIR) $(patsubst rsync,,$(@:rsync_%=%))
+
+$(DESTDIR)/bin/rsync:
+	$(MAKE) rsync_install
+ 
+rootfs_package: rsync_install
 
 #------------------------------------
 #
 sample01_DIR = package/sample01
 sample01_MAKEPARAM = $(MAKEPARAM)
 
-sample01 sample01_%: $(DESTDIR)/lib/libevent.so
+sample01 sample01_%: $(DESTDIR)/lib/libevent.so # $(DESTDIR)/lib/libdirect.so
 	$(MAKE) $(sample01_MAKEPARAM) \
 	  -C $(sample01_DIR) $(patsubst sample01,,$(@:sample01_%=%))
 
