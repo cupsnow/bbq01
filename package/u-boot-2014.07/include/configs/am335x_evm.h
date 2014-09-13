@@ -80,19 +80,21 @@
 	"bootaddr=0x80200000\0" \
 	"bootfile=uImage\0" \
 	"fdtfile=dtb\0" \
+	"initramfsaddr=0x81000000\0" \
+	"initramfsfile=uInitramfs\0" \
 	"console=ttyO0,115200n8\0" \
 	"initmmc=mmc dev 0; mmc rescan\0" \
-	"loadbootargs=setenv bootargs console=${console}\0" \
 	"loadimage=fatload mmc 0:1 ${bootaddr} ${bootfile}\0" \
 	"loadfdt=fatload mmc 0:1 ${fdtaddr} ${fdtfile}\0" \
+	"loadinitramfs=fatload mmc 0:1 ${initramfsaddr} ${initramfsfile}\0" \
+	"loadbootargs=setenv bootargs console=${console} root=/dev/ram0\0" \
 	NANDARGS \
 	DFUARGS
 #endif
 
 #define CONFIG_BOOTCOMMAND \
-	"run initmmc; run loadimage; run loadfdt;" \
-	"run loadbootargs;" \
-	"bootm ${bootaddr} - ${fdtaddr};"
+	"run initmmc; run loadimage; run loadfdt; run loadinitramfs;" \
+	"run loadbootargs; bootm ${bootaddr} ${initramfsaddr} ${fdtaddr};"
 
 /* NS16550 Configuration */
 #define CONFIG_SYS_NS16550_COM1		0x44e09000	/* Base EVM has UART0 */
