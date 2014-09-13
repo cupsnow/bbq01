@@ -1,28 +1,22 @@
-* Download following software and extract to directory
-  ** Directory tree under project
-     |--package/
-     |  |--busybox/
-     |  |    http://www.busybox.net/downloads/busybox-1.22.1.tar.bz2
-     |  |
-     |  |--linux/
-     |  |    https://www.kernel.org/pub/linux/kernel/v3.x/linux-3.15.1.tar.xz
-     |  |
-     |  |--u-boot/
-     |       ftp://ftp.denx.de/pub/u-boot/u-boot-2014.04.tar.bz2
-     |
-     |--tool/
-        |--toolchain/  
-             Sourcery CodeBench Lite for Arm GNU/Linux Release
-             http://www.mentor.com/embedded-software/sourcery-tools/sourcery-codebench/editions/lite-edition/
+* System overview
+  * BeagleBone Rev A6
 
-* Build project for qemu simulator
-    ./configure --board=qemu
-    make uboot_config linux_config busybox_config 
-    make initramfs
-    make rootfs
-   ./sim.sh
+* Build
+  * make dist
 
-* Build project for beagleboard
-    ./configure --board=bb
-    make uboot_config linux_config busybox_config 
-    make initramfs
+* Install
+  * copy dist/* to SD card boot partition in root directory
+
+* Directory tree:
+  * proj.mk
+  * Makefile
+      project scope Makefile
+  * prebuilt/
+      prebuilt files, copy to final system image
+  * package/
+      software packages
+  * tool/
+    * toolchain/
+        Sourcery CodeBench Lite for Arm GNU/Linux Release
+  * dist/
+    * distributed files
