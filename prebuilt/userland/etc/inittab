@@ -1,0 +1,7 @@
+::sysinit:/etc/rc.d/startup
+
+# ::respawn:/bin/sh
+::respawn:/sbin/getty -n -l /bin/sh -L 115200 ttyO0 vt100
+
+::ctrlaltdel:/sbin/reboot
+::shutdown:/etc/rc.d/shutdown
