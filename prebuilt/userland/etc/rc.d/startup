@@ -13,7 +13,10 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin
 for i in /var/run; do
   [ ! -d $i ] && mkdir -p $i
 done
-mount -t tmpfs none /var/run
+
+for i in /var/run /tmp; do
+  mount -t tmpfs none $i
+done
 
 echo -n "Setting hostname ..." 
   [ -f /etc/hostname ] && hostname -F /etc/hostname || hostname bbqLinux

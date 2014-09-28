@@ -7,6 +7,9 @@
 * Install
   * copy dist/* to SD card boot partition in root directory
 
+* Check dependent shared library for a <application> 
+  * objdump -p <application> | grep NEEDED
+
 * Directory tree:
   * proj.mk
   * Makefile
