@@ -1,32 +1,38 @@
-* System overview
-  * BeagleBone Rev A6
+### System overview
+* BeagleBone Rev A6
 
-* Build environment
-  * ubuntu 14.04 64bits
-  	$ cd tool && tar -jxvf arm-2014.05-29-arm-none-linux-gnueabi-i686-pc-linux-gnu.tar.bz2
-  	# setup runtime for the 32bits toolchain
-    $ sudo dpkg --add-architecture i386
-    $ sudo apt-get install gcc-multilib g++-multilib
+### Setup environment
+* For toolchain run on **Ubuntu 14.04 64bits**
 
-* Build
-  * make dist
+  	  	$ sudo dpkg --add-architecture i386
+  	  	$ sudo apt-get install gcc-multilib g++-multilib
 
-* Install
-  * copy dist/* to SD card boot partition in root directory
+* Extract toolchain under **tool/arm-2014.05-29-arm-none-linux-gnueabi-i686-pc-linux-gnu.tar.bz2**
 
-* Check dependent shared library for a <application> 
-  * objdump -p <application> | grep NEEDED
+### Build
+* build all
 
-* Directory tree:
-  * proj.mk
-  * Makefile
-      project scope Makefile
-  * prebuilt/
-      prebuilt files, copy to final system image
-  * package/
-      software packages
-  * tool/
-    * toolchain/
-        Sourcery CodeBench Lite for Arm GNU/Linux Release
-  * dist/
-    * distributed files
+        $ make dist
+
+### Install
+* SD card needs 2 partitions, **BOOT** and **ROOTFS**
+* copy **dist/boot/\*** to **BOOT** partition
+* copy **dist/userland/\*** **ROOTFS** partition
+
+### note
+* Check dependent shared library for an **OBJ**
+
+        $ objdump -p OBJ | grep NEEDED
+
+* Directory tree
+    * **proj.mk**
+    * **Makefile**
+        * project scope Makefile
+    * **prebuilt/**
+        * prebuilt files, copy to final system image
+    * **package/**
+        * software packages
+    * **tool/toolchain/**
+        * Sourcery CodeBench Lite for Arm GNU/Linux Release
+    * **dist/**
+        * distributed files
