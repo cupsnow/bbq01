@@ -1,16 +1,18 @@
 #------------------------------------
+#
 # PROJDIR = $(abspath .)
-# include $(PROJDIR)/.builder/proj.mk
-#
-# CROSS_COMPILE_PATH1 = $(PROJDIR)/tool/**/bin/arm-*linux-*gcc
-# CROSS_COMPILE_PATH2 = $(lastword $(wildcard $(CROSS_COMPILE_PATH1)))
-# CROSS_COMPILE_PATH = $(abspath $(dir $(CROSS_COMPILE_PATH2))..)
-# CROSS_COMPILE = $(patsubst %gcc,%,$(notdir $(CROSS_COMPILE_PATH2)))
-#
-# PATH1 = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH)/bin 
-#
-# export PATH := $(subst $(SPACE),:,$(PATH1) $(PATH))
-#
+# include $(PROJDIR)/proj.mk
+# 
+# CROSS_COMPILE_GCC = $(lastword $(wildcard $(PROJDIR)/tool/**/bin/*gcc))
+# CROSS_COMPILE_PATH = $(abspath $(dir $(CROSS_COMPILE_GCC))..)
+# CROSS_COMPILE = $(patsubst %gcc,%,$(notdir $(CROSS_COMPILE_GCC)))
+# 
+# EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH)/bin
+# 
+# export PATH := $(subst $(SPACE),:,$(EXTRA_PATH) $(PATH))
+# 
+# $(info Makefile *** PATH=$(PATH))
+
 PROJDIR ?= $(abspath .)
 PWD = $(abspath .)
 DESTDIR ?= $(PROJDIR)/obj
@@ -54,8 +56,9 @@ COLOR_GRAY = $(call _COLOR,37)
 
 #------------------------------------
 #
-$(info proj.mk *** MAKELEVEL=$(MAKELEVEL))
-$(info proj.mk *** PWD=$(PWD))
-# $(info proj.mk *** .VARIABLES=$(.VARIABLES))
-# $(info proj.mk *** .INCLUDE_DIRS=$(.INCLUDE_DIRS))
-$(info proj.mk *** MAKECMDGOALS=$(MAKECMDGOALS))
+$(info proj.mk *** MAKELEVEL: $(MAKELEVEL))
+$(info proj.mk *** PROJDIR: $(PROJDIR))
+$(info proj.mk *** PWD: $(PWD))
+$(info proj.mk *** MAKECMDGOALS: $(MAKECMDGOALS))
+# $(info proj.mk *** .VARIABLES: $(.VARIABLES))
+# $(info proj.mk *** .INCLUDE_DIRS: $(.INCLUDE_DIRS))

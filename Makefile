@@ -3,43 +3,44 @@
 PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
-CROSS_COMPILE_PATH1 = $(PROJDIR)/tool/**/bin/arm-*linux-*gcc
-CROSS_COMPILE_PATH2 = $(lastword $(wildcard $(CROSS_COMPILE_PATH1)))
-CROSS_COMPILE_PATH = $(abspath $(dir $(CROSS_COMPILE_PATH2))..)
-CROSS_COMPILE = $(patsubst %gcc,%,$(notdir $(CROSS_COMPILE_PATH2)))
+CROSS_COMPILE_GCC = $(lastword $(wildcard $(PROJDIR)/tool/**/bin/*gcc))
+CROSS_COMPILE_PATH = $(abspath $(dir $(CROSS_COMPILE_GCC))..)
+CROSS_COMPILE = $(patsubst %gcc,%,$(notdir $(CROSS_COMPILE_GCC)))
 
-PATH1 = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH)/bin 
+EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH)/bin
 
-export PATH := $(subst $(SPACE),:,$(PATH1) $(PATH))
-
-# $(info Makefile *** PATH=$(PATH))
+export PATH := $(subst $(SPACE),:,$(EXTRA_PATH) $(PATH))
 
 #------------------------------------
 #
-all:
-	$(MAKE) dist
+all: ;
+#	$(MAKE) dist
+
+#------------------------------------
+#
+tool: ;
+
+.PHONY: tool
 
 #------------------------------------
 #
 uboot_DIR = $(PROJDIR)/package/u-boot-2014.07
 uboot_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
-# uboot_MAKEPARAM = CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
 
 uboot_config:
 	$(uboot_MAKE) am335x_evm_config
 
+uboot_clean uboot_distclean:
+	$(uboot_MAKE) $(patsubst uboot,,$(@:uboot_%=%))
+
 uboot uboot_%:
-	if [ ! -e $(uboot_DIR)/include/config.mk ]; then \
+	if [ ! -f $(uboot_DIR)/include/config.mk ]; then \
 	  $(MAKE) uboot_config; \
 	fi
 	$(uboot_MAKE) $(patsubst uboot,,$(@:uboot_%=%))
 
-mkimage_install: $(PROJDIR)/tool/bin/mkimage
-
-$(PROJDIR)/tool/bin/mkimage:
+$(uboot_DIR)/tools/mkimage:
 	$(MAKE) uboot_tools
-	$(MKDIR) $(PROJDIR)/tool/bin
-	$(CP) $(uboot_DIR)/tools/mkimage $(PROJDIR)/tool/bin/
 
 $(uboot_DIR)/MLO $(uboot_DIR)/u-boot.img:
 	$(MAKE) uboot
@@ -47,41 +48,46 @@ $(uboot_DIR)/MLO $(uboot_DIR)/u-boot.img:
 #------------------------------------
 #
 linux_DIR = $(PROJDIR)/package/linux-3.16.2
-linux_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm LOADADDR=0x80008000
-linux_MAKE += INSTALL_HDR_PATH=$(DESTDIR)/usr INSTALL_MOD_PATH=$(DESTDIR)
-linux_MAKE += -C $(linux_DIR)
+linux_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
+  LOADADDR=0x80008000 INSTALL_HDR_PATH=$(DESTDIR)/usr \
+  INSTALL_MOD_PATH=$(DESTDIR) -C $(linux_DIR)
 
 linux_config:
 	$(linux_MAKE) bbq01_defconfig #multi_v7_defconfig
 
-linux_uImage: $(PROJDIR)/tool/bin/mkimage
+linux_clean linux_distclean linux_mrproper linux_clobber:
+	$(linux_MAKE) $(patsubst linux,,$(@:linux_%=%))
 
-linux linux_%:
-	if [ ! -e $(linux_DIR)/.config ]; then \
+linux linux_%: tool
+	if [ ! -f $(linux_DIR)/.config ]; then \
 	  $(MAKE) linux_config; \
 	fi
 	$(linux_MAKE) $(patsubst linux,,$(@:linux_%=%))
 
-$(DESTDIR)/usr/include/linux:
-	$(MAKE) linux_headers_install
-
-$(linux_DIR)/arch/arm/boot/uImage:
-	$(MAKE) linux_uImage
-
-$(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb:
-	$(MAKE) linux_dtbs
+#$(DESTDIR)/usr/include/linux:
+#	$(MAKE) linux_headers_install
+#
+#$(linux_DIR)/arch/arm/boot/uImage:
+#	$(MAKE) linux_uImage
+#
+#$(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb:
+#	$(MAKE) linux_dtbs
 
 #------------------------------------
 #
 busybox_DIR = $(PROJDIR)/package/busybox-1.22.1
-busybox_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) CONFIG_PREFIX=$(DESTDIR)
-busybox_MAKE += -C $(busybox_DIR)
+busybox_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) \
+  CONFIG_PREFIX=$(DESTDIR) -C $(busybox_DIR)
 
 busybox_config:
+#	$(MAKE) linux_headers_install
 	$(busybox_MAKE) defconfig
 
-busybox busybox_%: $(DESTDIR)/usr/include/linux
-	if [ ! -e $(busybox_DIR)/.config ]; then \
+busybox_clean busybox_distclean:
+	$(busybox_MAKE) $(patsubst busybox,,$(@:busybox_%=%))
+
+busybox busybox_%:
+	if [ ! -f $(busybox_DIR)/.config ]; then \
 	  $(MAKE) busybox_config; \
 	fi
 	$(busybox_MAKE) $(patsubst busybox,,$(@:busybox_%=%))
@@ -199,79 +205,81 @@ web01 web01_%:
 	  fi; \
 	fi
 	$(web01_MAKE) $(patsubst web01,,$(@:web01_%=%))
-	
+
 #------------------------------------
 #
-dist_DIR = $(PROJDIR)/dist
-dist:
-	$(RM) $(DESTDIR)
-	$(MAKE) dist_boot initramfs
-	$(RM) $(DESTDIR)
-	$(MAKE) userland
+tool: $(PROJDIR)/tool/bin/mkimage
 
-.PHONY: dist
+$(PROJDIR)/tool/bin/mkimage:
+	$(MAKE) $(uboot_DIR)/tools/mkimage
+	$(MKDIR) $(dir $@)
+	$(CP) $(uboot_DIR)/tools/mkimage $(dir $@)
 
-dist_boot: $(uboot_DIR)/MLO
-dist_boot: $(uboot_DIR)/u-boot.img
-dist_boot: $(linux_DIR)/arch/arm/boot/uImage
-dist_boot: $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb
-	$(MKDIR) $(dist_DIR)/boot
-	$(CP) $(uboot_DIR)/u-boot.img $(dist_DIR)/boot/
-	$(CP) $(uboot_DIR)/MLO $(dist_DIR)/boot/
-	$(CP) $(linux_DIR)/arch/arm/boot/uImage $(dist_DIR)/boot/
-	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
-	  $(dist_DIR)/boot/dtb
-
-DEVLIST = $(dist_DIR)/devlist
-INITRAMFS = $(dist_DIR)/initramfs
-initramfs:
-	# generate device list
+#------------------------------------
+#
+devlist:
+	$(MKDIR) $(dir $(DEVLIST))
 	echo -n "" > $(DEVLIST)
 	echo "dir /dev 0755 0 0" >> $(DEVLIST)
 	echo "nod /dev/console 0600 0 0 c 5 1" >> $(DEVLIST)
-	# install package
-	$(MAKE) S=$(DESTDIR) DESTDIR=$(INITRAMFS) dist_busybox 
-	# install prebuilt
-	$(CP) -d $(PROJDIR)/prebuilt/common/* $(INITRAMFS)/
-	$(CP) -d $(PROJDIR)/prebuilt/initramfs/* $(INITRAMFS)/
-	# generate initramfs
-	$(MKDIR) $(dist_DIR)/boot
-	cd $(linux_DIR) && \
-	  bash scripts/gen_initramfs_list.sh -o $(INITRAMFS).cpio.gz \
-	    $(INITRAMFS) $(DEVLIST)
-	mkimage -n 'Initramfs' -A arm -O linux -T ramdisk -C gzip \
-	  -d $(INITRAMFS).cpio.gz $(dist_DIR)/boot/uInitramfs
 
-.PHONY: initramfs
+.PHONY: devlist
 
-USERLAND = $(dist_DIR)/userland
-userland:
-	# install package
-	$(MAKE) userland_package
-	$(MAKE) S=$(DESTDIR) DESTDIR=$(USERLAND) dist_busybox dist_web01 \
-	  linux_modules_install
-	# install prebuilt
-	$(CP) -d $(PROJDIR)/prebuilt/common/* $(USERLAND)/
-	$(CP) -d $(PROJDIR)/prebuilt/userland/* $(USERLAND)/
-
-.PHONY: userland
-
-dist_busybox: dist_so1 busybox_install
-
-dist_so1:
+so1:
 	$(MKDIR) $(DESTDIR)/lib
 	for i in ld-*.so.* ld-*.so libpthread.so.* libpthread-*.so \
 	    libc.so.* libc-*.so libm.so.* libm-*.so; do \
 	  $(CP) -d $(CROSS_COMPILE_PATH)/arm-none-linux-gnueabi/libc/lib/$$i \
-	    $(DESTDIR)/lib/; \
+	    $(DESTDIR)/lib; \
 	done
 
-dist_gcc_s:
+so2:
 	$(MKDIR) $(DESTDIR)/lib
 	for i in libgcc_s.so.1; do \
 	  $(CP) -d $(CROSS_COMPILE_PATH)/arm-none-linux-gnueabi/libc/lib/$$i \
 	    $(DESTDIR)/lib/; \
 	done
+
+prebuilt1:
+	$(MKDIR) $(DESTDIR)
+	$(CP) -d $(PROJDIR)/prebuilt/common/* $(PREBUILT) $(DESTDIR)
+
+initramfs: tool
+	$(MAKE) linux_headers_install
+	$(MAKE) busybox
+	$(MAKE) DEVLIST=$(PROJDIR)/devlist DESTDIR=$(PROJDIR)/.initramfs \
+	  PREBUILT=$(PROJDIR)/prebuilt/initramfs/* \
+	  devlist so1 prebuilt1 busybox_install
+	cd $(linux_DIR) && bash scripts/gen_initramfs_list.sh \
+	  -o $(PROJDIR)/initramfs.cpio.gz \
+	  $(PROJDIR)/.initramfs $(PROJDIR)/devlist
+	mkimage -n 'bbq01 initramfs' -A arm -O linux -T ramdisk -C gzip \
+	  -d $(PROJDIR)/initramfs.cpio.gz $(PROJDIR)/initramfs
+
+.PHONY: initramfs
+
+userland: tool
+	$(MAKE) linux_headers_install
+	$(MAKE) busybox
+	$(MAKE) DESTDIR=$(PROJDIR)/userland \
+	  PREBUILT=$(PROJDIR)/prebuilt/userland/* \
+	  so1 so2 prebuilt1 busybox_install linux_modules_install
+
+.PHONY: userland
+
+dist:
+	$(RM) $(DESTDIR)
+	$(MAKE) initramfs uboot linux_uImage
+	$(RM) $(DESTDIR)
+	$(MAKE) userland
+	$(MKDIR) $(PROJDIR)/dist
+	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
+	  $(linux_DIR)/arch/arm/boot/uImage $(PROJDIR)/initramfs \
+	  $(PROJDIR)/dist
+	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
+	  $(PROJDIR)/dist/dtb
+
+.PHONY: dist
 
 userland_package:
 	$(MAKE) libevent_install libmoss_install 
