@@ -79,120 +79,6 @@ busybox busybox_%:
 
 #------------------------------------
 #
-libevent_DIR = $(PROJDIR)/package/libevent
-libevent_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libevent_DIR) 
-
-libevent_dir:
-	cd $(dir $(libevent_DIR)) && \
-	  wget https://github.com/downloads/libevent/libevent/libevent-2.0.21-stable.tar.gz && \
-	  tar -zxvf libevent-2.0.21-stable.tar.gz && \
-	  ln -sf libevent-2.0.21-stable $(notdir $(libevent_DIR))
-
-libevent_makefile:
-	cd $(libevent_DIR) && \
-	  ./configure --prefix=/ --host=`$(CC) -dumpmachine` \
-	    CPPFLAGS="-I$(DESTDIR)/include" \
-	    LDFLAGS="-L$(DESTDIR)/lib"
-
-$(addprefix libevent_,clean distclean): ;
-	if [ -e $(libevent_DIR)/Makefile ]; then \
-	  $(libevent_MAKE) $(patsubst libevent,,$(@:libevent_%=%)); \
-	fi
-
-libevent libevent_%:
-	if [ ! -d $(libevent_DIR) ]; then \
-	  $(MAKE) libevent_dir; \
-	fi
-	if [ ! -f $(libevent_DIR)/Makefile ]; then \
-	  $(MAKE) libevent_makefile; \
-	fi
-	$(libevent_MAKE) $(patsubst libevent,,$(@:libevent_%=%))
-
-#------------------------------------
-#
-libmoss_DIR = $(PROJDIR)/package/libmoss
-libmoss_MAKE = $(MAKE) $(MAKEPARAM) -C $(libmoss_DIR)
-
-libmoss_dir:
-	cd $(abspath $(libmoss_DIR)/..) && \
-	  git clone git@bitbucket.org:joelai/libmoss.git
-
-libmoss_configure:
-	if [ -x $(libmoss_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(libmoss_DIR) && ./autogen.sh; \
-	elif [ -e $(libmoss_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(libmoss_DIR) && autoreconf -fiv; \
-	fi
-
-libmoss_makefile:
-	echo "Makefile *** Generate Makefile by configure..."; \
-	cd $(libmoss_DIR) && \
-	  ./configure \
-	    --prefix=/ --host=`$(CC) -dumpmachine` --with-pic \
-	    CPPFLAGS="-I$(DESTDIR)/include" \
-	    LDFLAGS="-L$(DESTDIR)/lib"
-
-$(addprefix libmoss_,clean distclean): ;
-	if [ -e $(libmoss_DIR)/Makefile ]; then \
-	  $(libmoss_MAKE) $(patsubst libmoss,,$(@:libmoss_%=%)); \
-	fi
-
-libmoss libmoss_%:
-	if [ ! -d $(libmoss_DIR) ]; then \
-	  $(MAKE) libmoss_dir; \
-	fi
-	if [ ! -e $(libmoss_DIR)/Makefile ]; then \
-	  if [ ! -x $(libmoss_DIR)/configure ]; then \
-	    $(MAKE) libmoss_configure; \
-	  fi; \
-	  if [ -x $(libmoss_DIR)/configure ]; then \
-	    $(MAKE) libmoss_makefile; \
-	  fi; \
-	fi
-	$(libmoss_MAKE) $(patsubst libmoss,,$(@:libmoss_%=%))
-
-#------------------------------------
-#
-web01_DIR = $(PROJDIR)/package/web01
-web01_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(web01_DIR)
-
-web01_configure:
-	if [ -x $(web01_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(web01_DIR) && ./autogen.sh; \
-	elif [ -e $(web01_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(web01_DIR) && autoreconf -fiv; \
-	fi
-
-web01_makefile:
-	echo "Makefile *** Generate Makefile by configure..."; \
-	cd $(web01_DIR) && \
-	  ./configure \
-	    --prefix=/ --host=`$(CC) -dumpmachine` \
-	    CPPFLAGS="-I$(DESTDIR)/include" \
-	    LDFLAGS="-L$(DESTDIR)/lib"
-
-$(addprefix web01_,clean distclean): ;
-	if [ -e $(web01_DIR)/Makefile ]; then \
-	  $(web01_MAKE) $(patsubst web01,,$(@:web01_%=%)); \
-	fi
-
-web01 web01_%:
-	if [ ! -e $(web01_DIR)/Makefile ]; then \
-	  if [ ! -x $(web01_DIR)/configure ]; then \
-	    $(MAKE) web01_configure; \
-	  fi; \
-	  if [ -x $(web01_DIR)/configure ]; then \
-	    $(MAKE) web01_makefile; \
-	  fi; \
-	fi
-	$(web01_MAKE) $(patsubst web01,,$(@:web01_%=%))
-
-#------------------------------------
-#
 tool: $(PROJDIR)/tool/bin/mkimage
 
 $(PROJDIR)/tool/bin/mkimage:
@@ -263,35 +149,11 @@ dist:
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
 	  $(linux_DIR)/arch/arm/boot/uImage $(PROJDIR)/initramfs \
 	  $(PROJDIR)/dist
+	$(MKDIR) $(PROJDIR)/dist/beaglebone
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
-	  $(PROJDIR)/dist/dtb
+	  $(PROJDIR)/dist/beaglebone/dtb
+	$(MKDIR) $(PROJDIR)/dist/beagleboard
+	$(CP) $(linux_DIR)/arch/arm/boot/dts/omap3-beagle-xm.dtb \
+	  $(PROJDIR)/dist/beagleboard/dtb
 
 .PHONY: dist
-
-#------------------------------------
-# old target
-#
-userland_package:
-	$(MAKE) libevent_install libmoss_install 
-	$(MAKE) web01_install
-
-dist_libevent: dist_gcc_s dist_so1
-	$(MKDIR) $(DESTDIR)/lib
-	for i in libevent.so libevent-2.0.so.* \
-	    libevent_core.so libevent_core-2.0.so.* \
-	    libevent_extra.so libevent_extra-2.0.so.* \
-	    libevent_pthreads.so libevent_pthreads-2.0.so.*; do \
-	  $(CP) -d $(S)/lib/$$i $(DESTDIR)/lib/; \
-	done
-
-dist_libmoss: dist_gcc_s dist_so1
-	$(MKDIR) $(DESTDIR)/lib
-	for i in libmoss.so libmoss.so.*; do \
-	  $(CP) -d $(S)/lib/$$i $(DESTDIR)/lib/; \
-	done
-
-dist_web01: dist_libevent dist_libmoss
-	$(MKDIR) $(DESTDIR)/bin
-	for i in web01; do \
-	  $(CP) -d $(S)/bin/$$i $(DESTDIR)/bin/; \
-	done
