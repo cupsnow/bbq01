@@ -39,12 +39,6 @@ uboot uboot_%:
 	fi
 	$(uboot_MAKE) $(patsubst uboot,,$(@:uboot_%=%))
 
-$(uboot_DIR)/tools/mkimage:
-	$(MAKE) uboot_tools
-
-$(uboot_DIR)/MLO $(uboot_DIR)/u-boot.img:
-	$(MAKE) uboot
-
 #------------------------------------
 #
 linux_DIR = $(PROJDIR)/package/linux-3.16.2
@@ -63,15 +57,6 @@ linux linux_%: tool
 	  $(MAKE) linux_config; \
 	fi
 	$(linux_MAKE) $(patsubst linux,,$(@:linux_%=%))
-
-#$(DESTDIR)/usr/include/linux:
-#	$(MAKE) linux_headers_install
-#
-#$(linux_DIR)/arch/arm/boot/uImage:
-#	$(MAKE) linux_uImage
-#
-#$(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb:
-#	$(MAKE) linux_dtbs
 
 #------------------------------------
 #
@@ -211,7 +196,7 @@ web01 web01_%:
 tool: $(PROJDIR)/tool/bin/mkimage
 
 $(PROJDIR)/tool/bin/mkimage:
-	$(MAKE) $(uboot_DIR)/tools/mkimage
+	$(MAKE) uboot_tools
 	$(MKDIR) $(dir $@)
 	$(CP) $(uboot_DIR)/tools/mkimage $(dir $@)
 
@@ -240,16 +225,18 @@ so2:
 	    $(DESTDIR)/lib/; \
 	done
 
-prebuilt1:
+prebuilt:
 	$(MKDIR) $(DESTDIR)
 	$(CP) -d $(PROJDIR)/prebuilt/common/* $(PREBUILT) $(DESTDIR)
+
+.PHONY: prebuilt
 
 initramfs: tool
 	$(MAKE) linux_headers_install
 	$(MAKE) busybox
 	$(MAKE) DEVLIST=$(PROJDIR)/devlist DESTDIR=$(PROJDIR)/.initramfs \
 	  PREBUILT=$(PROJDIR)/prebuilt/initramfs/* \
-	  devlist so1 prebuilt1 busybox_install
+	  devlist so1 prebuilt busybox_install
 	cd $(linux_DIR) && bash scripts/gen_initramfs_list.sh \
 	  -o $(PROJDIR)/initramfs.cpio.gz \
 	  $(PROJDIR)/.initramfs $(PROJDIR)/devlist
@@ -263,13 +250,13 @@ userland: tool
 	$(MAKE) busybox
 	$(MAKE) DESTDIR=$(PROJDIR)/userland \
 	  PREBUILT=$(PROJDIR)/prebuilt/userland/* \
-	  so1 so2 prebuilt1 busybox_install linux_modules_install
+	  so1 so2 prebuilt busybox_install linux_modules_install
 
 .PHONY: userland
 
 dist:
 	$(RM) $(DESTDIR)
-	$(MAKE) initramfs uboot linux_uImage
+	$(MAKE) initramfs uboot linux_uImage linux_dtbs
 	$(RM) $(DESTDIR)
 	$(MAKE) userland
 	$(MKDIR) $(PROJDIR)/dist
@@ -281,6 +268,9 @@ dist:
 
 .PHONY: dist
 
+#------------------------------------
+# old target
+#
 userland_package:
 	$(MAKE) libevent_install libmoss_install 
 	$(MAKE) web01_install
