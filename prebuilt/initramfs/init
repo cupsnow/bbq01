@@ -5,12 +5,12 @@ gotonewroot() {
   ROOTDEV=/dev/mmcblk0p2
   
   echo -n "Mount new root ..."
-    [ ! -d $ROOTDIR ] && mkdir -p $ROOTDIR
-    mount $ROOTDEV $ROOTDIR || return
+  [ ! -d $ROOTDIR ] && mkdir -p $ROOTDIR
+  mount $ROOTDEV $ROOTDIR || return
   check_status
   
   for i in sys proc dev; do
-    mount --move /$i $ROOTDIR/$i
+    mount --move /$i $ROOTDIR/$i || return
   done
 
   exec switch_root $ROOTDIR /sbin/init

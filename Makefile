@@ -141,9 +141,13 @@ initramfs: tool
 userland: tool
 	$(MAKE) linux_headers_install
 	$(MAKE) busybox
+	for i in proc sys dev tmp var/run; do \
+	  [ -d $(PROJDIR)/userland/$$i ] || \
+	    $(MKDIR) $(PROJDIR)/userland/$$i; \
+	done
 	$(MAKE) DESTDIR=$(PROJDIR)/userland \
-	  PREBUILT=$(PROJDIR)/prebuilt/userland/* \
-	  so1 so2 prebuilt busybox_install linux_modules_install
+	  PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
+	  so1 so2 busybox_install linux_modules_install prebuilt
 
 .PHONY: userland
 
