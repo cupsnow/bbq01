@@ -11,10 +11,13 @@ EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH)/bin
 
 export PATH := $(subst $(SPACE),:,$(EXTRA_PATH) $(PATH))
 
+# BB, XM, QEMU
+PLATFORM = XM
+
 #------------------------------------
 #
 all: ;
-#	$(MAKE) dist
+	$(MAKE) uboot
 
 #------------------------------------
 #
@@ -28,7 +31,11 @@ uboot_DIR = $(PROJDIR)/package/u-boot-2014.07
 uboot_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
 
 uboot_config:
+ifeq ("$(PLATFORM)","XM")
+	$(uboot_MAKE) omap3_beagle_config
+else
 	$(uboot_MAKE) am335x_evm_config
+endif
 
 uboot_clean uboot_distclean:
 	$(uboot_MAKE) $(patsubst uboot,,$(@:uboot_%=%))
@@ -145,15 +152,20 @@ dist:
 	$(MAKE) initramfs uboot linux_uImage linux_dtbs
 	$(RM) $(DESTDIR)
 	$(MAKE) userland
-	$(MKDIR) $(PROJDIR)/dist
-	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
-	  $(linux_DIR)/arch/arm/boot/uImage $(PROJDIR)/initramfs \
-	  $(PROJDIR)/dist
-	$(MKDIR) $(PROJDIR)/dist/beaglebone
-	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
-	  $(PROJDIR)/dist/beaglebone/dtb
+ifeq ("$(PLATFORM)","XM")
 	$(MKDIR) $(PROJDIR)/dist/beagleboard
+	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
+	  $(PROJDIR)/dist/beagleboard
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/omap3-beagle-xm.dtb \
 	  $(PROJDIR)/dist/beagleboard/dtb
+else
+	$(MKDIR) $(PROJDIR)/dist/beaglebone
+	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
+	  $(PROJDIR)/dist/beaglebone
+	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
+	  $(PROJDIR)/dist/beaglebone/dtb
+endif
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage $(PROJDIR)/initramfs \
+	  $(PROJDIR)/dist
 
 .PHONY: dist

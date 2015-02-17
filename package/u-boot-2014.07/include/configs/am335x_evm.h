@@ -81,7 +81,7 @@
 	"bootfile=uImage\0" \
 	"fdtfile=dtb\0" \
 	"initramfsaddr=0x81000000\0" \
-	"initramfsfile=uInitramfs\0" \
+	"initramfsfile=initramfs\0" \
 	"console=ttyO0,115200n8\0" \
 	"initmmc=mmc dev 0; mmc rescan\0" \
 	"loadimage=fatload mmc 0:1 ${bootaddr} ${bootfile}\0" \
