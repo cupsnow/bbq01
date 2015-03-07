@@ -11,13 +11,13 @@ EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH)/bin
 
 export PATH := $(subst $(SPACE),:,$(EXTRA_PATH) $(PATH))
 
-# BB, XM, QEMU
-PLATFORM = XM
+# BB, XM, QEMU, PI2
+PLATFORM = PI2
 
 #------------------------------------
 #
 all: ;
-	$(MAKE) uboot
+#	$(MAKE) uboot
 
 #------------------------------------
 #
@@ -48,13 +48,27 @@ uboot uboot_%:
 
 #------------------------------------
 #
+ifeq ("$(PLATFORM)","PI2")
+# git clone --depth=1 https://github.com/raspberrypi/linux linux-pi
+linux_DIR = $(PROJDIR)/package/linux-pi
+else
 linux_DIR = $(PROJDIR)/package/linux-3.16.2
+endif
+
 linux_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
-  LOADADDR=0x80008000 INSTALL_HDR_PATH=$(DESTDIR)/usr \
-  INSTALL_MOD_PATH=$(DESTDIR) -C $(linux_DIR)
+  INSTALL_HDR_PATH=$(DESTDIR)/usr INSTALL_MOD_PATH=$(DESTDIR) \
+  -C $(linux_DIR)
+ifeq ("$(PLATFORM)","PI2")
+else
+linux_MAKE += LOADADDR=0x80008000
+endif
 
 linux_config:
+ifeq ("$(PLATFORM)","PI2")
+	$(linux_MAKE) bcm2709_defconfig
+else
 	$(linux_MAKE) bbq01_defconfig #multi_v7_defconfig
+endif
 
 linux_clean linux_distclean linux_mrproper linux_clobber:
 	$(linux_MAKE) $(patsubst linux,,$(@:linux_%=%))
@@ -95,6 +109,9 @@ $(PROJDIR)/tool/bin/mkimage:
 
 #------------------------------------
 #
+# git clone --depth=1 https://github.com/raspberrypi/firmware.git pi-firmware
+pi-firmware_DIR = $(PROJDIR)/package/pi-firmware
+
 devlist:
 	$(MKDIR) $(dir $(DEVLIST))
 	echo -n "" > $(DEVLIST)
@@ -146,17 +163,36 @@ userland: tool
 	    $(MKDIR) $(PROJDIR)/userland/$$i; \
 	done
 	$(MAKE) DESTDIR=$(PROJDIR)/userland \
-	  PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
-	  so1 so2 busybox_install linux_modules_install prebuilt
+	  so1 so2 busybox_install linux_modules_install
+ifeq ("$(PLATFORM)","PI2")
+	$(MAKE) DESTDIR=$(PROJDIR)/userland \
+	  PREBUILT="$(PROJDIR)/prebuilt/userland/* $(PROJDIR)/prebuilt/userland-pi/*" \
+	  prebuilt
+else
+	$(MAKE) DESTDIR=$(PROJDIR)/userland \
+	  PREBUILT="$(PROJDIR)/prebuilt/userland/*" prebuilt
+endif
 
 .PHONY: userland
 
 dist:
+ifeq ("$(PLATFORM)","PI2")
+	$(MAKE) linux_uImage
+else
 	$(RM) $(DESTDIR)
 	$(MAKE) initramfs uboot linux_uImage linux_dtbs
+endif
 	$(RM) $(DESTDIR)
 	$(MAKE) userland
-ifeq ("$(PLATFORM)","XM")
+ifeq ("$(PLATFORM)","PI2")
+	$(MKDIR) $(PROJDIR)/dist/pi2
+	$(CP) $(linux_DIR)/arch/arm/boot/zImage \
+	  $(PROJDIR)/dist/pi2/kernel.img
+	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2709-rpi-2-b.dtb \
+	  $(pi-firmware_DIR)/boot/bootcode.bin \
+	  $(pi-firmware_DIR)/boot/start.elf \
+	  $(PROJDIR)/dist/pi2/
+else ifeq ("$(PLATFORM)","XM")
 	$(MKDIR) $(PROJDIR)/dist/beagleboard
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
 	  $(PROJDIR)/dist/beagleboard
@@ -169,7 +205,10 @@ else
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
 	  $(PROJDIR)/dist/beaglebone/dtb
 endif
+ifeq ("$(PLATFORM)","PI2")
+else
 	$(CP) $(linux_DIR)/arch/arm/boot/uImage $(PROJDIR)/initramfs \
 	  $(PROJDIR)/dist
+endif
 
 .PHONY: dist
