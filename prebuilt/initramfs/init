@@ -27,12 +27,12 @@ echo -n "Start in initramfs"
 gotonewroot
 
 echo "Pass through to terminal ..."
-cat << EOF
+cat <<'BannerEOF'
  _     _            ___  _ 
 | |__ | |__   __ _ / _ \/ |
 | '_ \| '_ \ / _` | | | | |
 | |_) | |_) | (_| | |_| | |
 |_.__/|_.__/ \__, |\___/|_|
                 |_|        
-EOF
+BannerEOF
 exec /bin/sh

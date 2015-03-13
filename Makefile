@@ -212,3 +212,14 @@ else
 endif
 
 .PHONY: dist
+
+#------------------------------------
+#
+gpioctl_DIR = $(PROJDIR)/package/gpioctl
+gpioctl_MAKE = $(MAKE) $(MAKEPARAM) CROSS_COMPILE=$(CROSS_COMPILE) \
+  -C $(gpioctl_DIR)
+
+gpioctl gpioctl_%:
+	$(gpioctl_MAKE) $(patsubst gpioctl,,$(@:gpioctl_%=%))
+
+	
