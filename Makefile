@@ -109,8 +109,8 @@ $(PROJDIR)/tool/bin/mkimage:
 
 #------------------------------------
 #
-# git clone --depth=1 https://github.com/raspberrypi/firmware.git pi-firmware
-pi-firmware_DIR = $(PROJDIR)/package/pi-firmware
+# git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi
+firmware-pi_DIR = $(PROJDIR)/package/firmware-pi
 
 devlist:
 	$(MKDIR) $(dir $(DEVLIST))
@@ -189,8 +189,8 @@ ifeq ("$(PLATFORM)","PI2")
 	$(CP) $(linux_DIR)/arch/arm/boot/zImage \
 	  $(PROJDIR)/dist/pi2/kernel.img
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2709-rpi-2-b.dtb \
-	  $(pi-firmware_DIR)/boot/bootcode.bin \
-	  $(pi-firmware_DIR)/boot/start.elf \
+	  $(firmware-pi_DIR)/boot/bootcode.bin \
+	  $(firmware-pi_DIR)/boot/start.elf \
 	  $(PROJDIR)/dist/pi2/
 else ifeq ("$(PLATFORM)","XM")
 	$(MKDIR) $(PROJDIR)/dist/beagleboard

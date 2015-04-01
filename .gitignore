@@ -1,5 +1,6 @@
 package/busybox*
 package/linux-*
+package/firmware-pi
 tool
 devlist
 dist
