@@ -191,6 +191,9 @@ ifeq ("$(PLATFORM)","PI2")
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2709-rpi-2-b.dtb \
 	  $(firmware-pi_DIR)/boot/bootcode.bin \
 	  $(firmware-pi_DIR)/boot/start.elf \
+	  $(firmware-pi_DIR)/boot/fixup.dat \
+	  $(firmware-pi_DIR)/boot/start_x.elf \
+	  $(firmware-pi_DIR)/boot/fixup_x.dat \
 	  $(PROJDIR)/dist/pi2/
 else ifeq ("$(PLATFORM)","XM")
 	$(MKDIR) $(PROJDIR)/dist/beagleboard
