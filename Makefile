@@ -108,8 +108,8 @@ $(PROJDIR)/tool/bin/mkimage:
 	$(CP) $(uboot_DIR)/tools/mkimage $(dir $@)
 
 #------------------------------------
-#
 # git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi
+#
 firmware-pi_DIR = $(PROJDIR)/package/firmware-pi
 
 devlist:
@@ -194,6 +194,7 @@ ifeq ("$(PLATFORM)","PI2")
 	  $(firmware-pi_DIR)/boot/fixup.dat \
 	  $(firmware-pi_DIR)/boot/start_x.elf \
 	  $(firmware-pi_DIR)/boot/fixup_x.dat \
+	  $(PROJDIR)/prebuilt/boot-pi/* \
 	  $(PROJDIR)/dist/pi2/
 else ifeq ("$(PLATFORM)","XM")
 	$(MKDIR) $(PROJDIR)/dist/beagleboard
