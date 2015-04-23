@@ -28,7 +28,9 @@ C++ = $(CROSS_COMPILE)g++
 LD = $(CROSS_COMPILE)ld
 AS = $(CROSS_COMPILE)as
 AR = $(CROSS_COMPILE)ar
+STRIP = $(CROSS_COMPILE)strip
 INSTALL = install -D
+INSTALL_STRIP = install -D -s --strip-program=$(STRIP)
 RM = rm -rf
 MKDIR = mkdir -p
 CP = cp -R

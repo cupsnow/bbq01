@@ -8,7 +8,7 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
 # should be done in /init or initramfs
-# . /etc/rc.d/init.d/sysinit
+[ -f /etc/rc.d/init.d/sysinit ] && . /etc/rc.d/init.d/sysinit
 
 for i in /var/run; do
   [ ! -d $i ] && mkdir -p $i
