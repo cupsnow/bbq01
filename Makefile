@@ -368,6 +368,52 @@ ffmpeg ffmpeg_%:
 
 #------------------------------------
 #
+mpg123_DIR = $(PROJDIR)/package/mpg123
+mpg123_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mpg123_DIR)
+mpg123_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+    --with-cpu=arm_fpu --disable-id3v2 --disable-icy \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+mpg123_dir:
+	wget -O $(dir $(mpg123_DIR))/mpg123-1.22.1.tar.bz2 \
+	    http://downloads.sourceforge.net/project/mpg123/mpg123/1.22.1/mpg123-1.22.1.tar.bz2
+	cd $(dir $(mpg123_DIR)) && \
+	    tar -jxvf mpg123-1.22.1.tar.bz2 && \
+	    ln -sf mpg123-1.22.1 mpg123
+
+mpg123_clean mpg123_distclean:
+	if [ -e $(mpg123_DIR)/Makefile ]; then \
+	  $(mpg123_MAKE) $(patsubst mpg123,,$(@:mpg123_%=%)); \
+	fi
+
+mpg123_configure:
+	if [ -x $(mpg123_DIR)/autogen.sh ]; then \
+	  echo "Makefile *** Generate configure by autogen.sh..."; \
+	  cd $(mpg123_DIR) && ./autogen.sh; \
+	elif [ -e $(mpg123_DIR)/configure.ac ]; then \
+	  echo "Makefile *** Generate configure by autoreconf..."; \
+	  cd $(mpg123_DIR) && autoreconf -fiv; \
+	fi
+
+mpg123_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(mpg123_DIR) && ./configure $(mpg123_CFGPARAM)
+
+mpg123 mpg123_%:
+	if [ ! -d $(mpg123_DIR) ]; then \
+	  $(MAKE) mpg123_dir; \
+	fi
+	if [ ! -x $(mpg123_DIR)/configure ]; then \
+	  $(MAKE) mpg123_configure; \
+	fi; \
+	if [ ! -e $(mpg123_DIR)/Makefile ]; then \
+	  $(MAKE) mpg123_makefile; \
+	fi
+	$(mpg123_MAKE) $(patsubst mpg123,,$(@:mpg123_%=%))
+
+#------------------------------------
+#
 libmoss_DIR = $(PROJDIR)/package/libmoss
 libmoss_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libmoss_DIR)
 libmoss_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \

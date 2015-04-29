@@ -247,7 +247,9 @@ int main(int argc, char *const *argv)
 			}
 		}
 	}
-	if (impl.pin < 2 || impl.pin > 27) {
+
+	/* pin32 : led on camera module */
+	if ((impl.pin != 32 && (impl.pin < 2 || impl.pin > 27))) {
 		log_error("unknown gpio pin\n");
 		help(argv[0]);
 		goto finally;
