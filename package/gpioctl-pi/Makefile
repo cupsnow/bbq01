@@ -41,8 +41,8 @@ $(gpioctl_OBJ): %.o : %.c
 -include $(addsuffix $(DEP),$(gpioctl_OBJ))
 
 install: bin/gpioctl
-	$(MKDIR) $(DESTDIR)/bin
-	$(INSTALL_STRIP) bin/gpioctl $(DESTDIR)/bin/
+	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL_STRIP) bin/gpioctl $(DESTDIR)$(PREFIX)/bin/
 
 clean distclean:
 	$(RM) bin $(gpioctl_OBJ) $(addsuffix $(DEP),$(gpioctl_OBJ))

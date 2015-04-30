@@ -463,7 +463,8 @@ libmoss libmoss_%:
 #------------------------------------
 #
 v4l2info_DIR = $(PROJDIR)/package/v4l2info
-v4l2info_MAKE = $(MAKE) DESTDIR=$(DESTDIR)/usr CROSS_COMPILE=$(CROSS_COMPILE) \
+v4l2info_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
+    CROSS_COMPILE=$(CROSS_COMPILE) \
     EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
     -C $(v4l2info_DIR)
@@ -474,7 +475,8 @@ v4l2info v4l2info_%:
 #------------------------------------
 #
 gpioctl-pi_DIR = $(PROJDIR)/package/gpioctl-pi
-gpioctl-pi_MAKE = $(MAKE) DESTDIR=$(DESTDIR)/usr CROSS_COMPILE=$(CROSS_COMPILE) \
+gpioctl-pi_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
+    CROSS_COMPILE=$(CROSS_COMPILE) \
     EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
     -C $(gpioctl-pi_DIR)
@@ -557,7 +559,8 @@ else
 	    PREBUILT="$(PROJDIR)/prebuilt/userland/*" prebuilt
 endif
 	$(MAKE) libevent_install libjpeg-turbo_install json-c_install \
-	    x264_install zlib_install libmoss_install v4l2info_install
+	    x264_install zlib_install libmoss_install \
+	    v4l2info_install gpioctl-pi_install mpg123_install
 	$(MKDIR) $(PROJDIR)/userland/lib
 	for i in libevent_core.so libevent_core-*.so.* \
 	    libevent_extra.so libevent_extra-*.so.* \
@@ -565,7 +568,8 @@ endif
 	    libevent.so libevent-*.so.* \
 	    libjpeg.so libjpeg.so.* libturbojpeg.so libturbojpeg.so.* \
 	    libjson-c.so libjson-c.so.* libx264.so libx264.so.* \
-	    libz.so libz.so.* libmoss.so libmoss.so.*; do \
+	    libz.so libz.so.* libmoss.so libmoss.so.* \
+	    libmpg123.so libmpg123.so.*; do \
 	  for j in $(DESTDIR)/lib/$$i; do \
 	    if [ -x $$j ]; then \
 	      $(INSTALL_STRIP) $$j $(PROJDIR)/userland/lib; \
@@ -576,8 +580,20 @@ endif
 	    fi; \
 	  done; \
 	done
+	$(MKDIR) $(PROJDIR)/userland/bin
+	for i in mpg123; do \
+	  for j in $(DESTDIR)/bin/$$i; do \
+	    if [ -x $$j ]; then \
+	      $(INSTALL_STRIP) $$j $(PROJDIR)/userland/bin; \
+	    elif [ -e $$j ]; then \
+	      $(CP) -d $$j $(PROJDIR)/userland/bin/; \
+	    else \
+	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
+	    fi; \
+	  done; \
+	done
 	$(MKDIR) $(PROJDIR)/userland/usr/bin
-	for i in v4l2info; do \
+	for i in gpioctl v4l2info; do \
 	  for j in $(DESTDIR)/usr/bin/$$i; do \
 	    if [ -x $$j ]; then \
 	      $(INSTALL_STRIP) $$j $(PROJDIR)/userland/usr/bin; \

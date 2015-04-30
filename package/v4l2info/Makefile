@@ -41,8 +41,8 @@ $(v4l2info_OBJ): %.o : %.c
 -include $(addsuffix $(DEP),$(v4l2info_OBJ))
 
 install: bin/v4l2info
-	$(MKDIR) $(DESTDIR)/bin
-	$(INSTALL_STRIP) bin/v4l2info $(DESTDIR)/bin/
+	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL_STRIP) bin/v4l2info $(DESTDIR)$(PREFIX)/bin/
 
 clean distclean:
 	$(RM) bin $(v4l2info_OBJ) $(addsuffix $(DEP),$(v4l2info_OBJ))

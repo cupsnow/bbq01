@@ -1,46 +1,24 @@
 
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdint.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <getopt.h>
-#include <linux/videodev2.h>
+#include "util.h"
 
-#define log_msg(level, msg, args...) do { \
-	printf(level "%s #%d " msg, __func__, __LINE__, ##args); \
-} while(0)
-#define log_debug(msg, args...) log_msg("Debug ", msg, ##args)
-#define log_error(msg, args...) log_msg("ERROR ", msg, ##args)
-#define MOSS_FILE_MODE_DIR(_path) S_ISDIR(moss_file_mode(_path))
-#define MOSS_XOR(_a, _b) (!!(_a) ^ !!(_b))
+typedef enum trigger_enum {
+	TRIGGER_NONE,
+	TRIGGER_RISING,
+	TRIGGER_FALLING,
+	TRIGGER_BOTH,
+
+} trigger_t;
 
 static struct {
 	void *init;
 	int pin, dir, val;
+	trigger_t trig;
+
+	moss_evm_t *evm;
+	moss_ev_t *ev;
+	int fd;
+
 } impl = {NULL};
-
-static char* moss_stripr(char *s)
-{
-	int len = s ? strlen(s) : 0;
-
-	while(--len >= 0 && isspace(s[len]));
-	if (s) s[len + 1] = '\0';
-	return s;
-}
-
-static int moss_file_mode(const char *path)
-{
-	struct stat st;
-
-	if (stat(path, &st) != 0) return 0;
-	return st.st_mode;
-}
 
 static void help(const char *name)
 {
@@ -52,65 +30,106 @@ static void help(const char *name)
 "  Demo to access GPIO\n"
 "\n"
 "OPTION\n"
-"  -h, --help       show this help\n"
-"  -p, --pin=PIN    select gpio PIN\n"
-"  -i, --in         config gpio input\n"
-"  -o, --out=VALUE  config gpio output and set value when VALUE >= 0\n"
+"  -h, --help  show this help\n"
+"  -p, --pin=PIN\n"
+"              select gpio PIN\n"
+"  -i, --in[=METHOD]\n"
+"              config gpio input, edge trigger monitor\n"
+"              METHOD := <rising | falling | both>\n"
+"  -o, --out[=VALUE]\n"
+"              config gpio output, output value\n"
+"              VALUE := <0 | 1>\n"
 "\n",
 name);
 }
 
-static int gpio_write(const void *msg, size_t len, const char *fn_fmt, ...)
+static int file_vopen(unsigned mode, const char *fmt, va_list ap)
 {
 	char fn[] = "/sys/class/gpio/gpio00000000/01234567890abcdef";
-	va_list ap;
-	int r, fd;
+	int r;
 
-	va_start(ap, fn_fmt);
-	r = vsnprintf(fn, sizeof(fn), fn_fmt, ap);
-	va_end(ap);
+	r = vsnprintf(fn, sizeof(fn), fmt, ap);
 	if (r <= 0 || r >= sizeof(fn)) {
 		log_error("generate filename\n");
-		return EINVAL;
+		return -1;
 	}
-	if ((fd = open(fn, O_WRONLY)) == -1) {
+	if ((r = open(fn, mode)) == -1) {
 		r = errno;
 		log_error("open %s, %s(%d)\n", fn, strerror(r), r);
-		return r;
+		return -1;
+	}
+	return r;
+}
+
+static int file_open(unsigned mode, const char *fmt, ...)
+{
+	va_list ap;
+	int r;
+
+	va_start(ap, fmt);
+	r = file_vopen(mode, fmt, ap);
+	va_end(ap);
+	return r;
+}
+
+static int file_vwrite(int fd, const char *fmt, va_list ap)
+{
+	char msg[] = "01234567890abcdef01234567890abcdef01234567890abcdef";
+	int r, len;
+
+	len = vsnprintf(msg, sizeof(msg), fmt, ap);
+	if (len <= 0 || len >= sizeof(msg)) {
+		log_error("generate message\n");
+		return EINVAL;
 	}
 	if ((r = write(fd, msg, len)) != len) {
 		if (r < 0) {
 			r = errno;
 			log_error("write, %s(%d)\n", strerror(r), r);
-		} else {
-			r = EIO;
-			log_error("write incomplete %d / %d\n", r, len);
+			return r;
 		}
-	} else {
-		r = 0;
+		log_error("write incomplete %d / %d\n", r, len);
+		return EIO;
 	}
+	return 0;
+}
+
+static int file_write(int fd, const char *fmt, ...)
+{
+	va_list ap;
+	int r;
+
+	va_start(ap, fmt);
+	r = file_vwrite(fd, fmt, ap);
+	va_end(ap);
+	return r;
+}
+
+static int gpio_write(const void *msg, size_t len, const char *fn_fmt, ...)
+{
+	va_list ap;
+	int r, fd;
+
+	va_start(ap, fn_fmt);
+	fd = file_vopen(O_WRONLY, fn_fmt, ap);
+	va_end(ap);
+
+	if (fd == -1) return EIO;
+	r = file_write(fd, msg);
 	close(fd);
 	return r;
 }
 
 static int gpio_read(void *msg, size_t len, const char *fn_fmt, ...)
 {
-	char fn[] = "/sys/class/gpio/gpio00000000/01234567890abcdef";
 	va_list ap;
 	int r, fd;
 
 	va_start(ap, fn_fmt);
-	r = vsnprintf(fn, sizeof(fn), fn_fmt, ap);
+	fd = file_vopen(O_RDONLY, fn_fmt, ap);
 	va_end(ap);
-	if (r <= 0 || r >= sizeof(fn)) {
-		log_error("generate filename\n");
-		return -1;
-	}
-	if ((fd = open(fn, O_RDONLY)) == -1) {
-		r = errno;
-		log_error("open %s, %s(%d)\n", fn, strerror(r), r);
-		return -1;
-	}
+
+	if (fd == -1) return EIO;
 	if ((r = read(fd, msg, len)) < 0) {
 		r = errno;
 		log_error("read, %s(%d)\n", strerror(r), r);
@@ -121,7 +140,7 @@ static int gpio_read(void *msg, size_t len, const char *fn_fmt, ...)
 	return r;
 }
 
-static int gpio_open(int pin)
+static int gpio_open(int pin, int sw)
 {
 	char msg[] = "/sys/class/gpio/gpio01234567890";
 	int fd, r, i;
@@ -131,17 +150,22 @@ static int gpio_open(int pin)
 		log_error("generate filename\n");
 		return EINVAL;
 	}
-	if (MOSS_FILE_MODE_DIR(msg)) return 0;
+	r = MOSS_FILE_MODE_DIR(msg);
+	if (MOSS_XOR(sw, r) == 0) {
+		return 0;
+	}
 
 	i = snprintf(msg, sizeof(msg), "%d", pin);
 	if (i >= sizeof(msg)) {
 		log_error("generate pin num\n");
 		return EINVAL;
 	}
-	if ((r = gpio_write(msg, i, "/sys/class/gpio/export")) != 0) {
-		log_error("gpio open\n");
+	if ((r = gpio_write(msg, i, "/sys/class/gpio/%s",
+			(sw ? "export" : "unexport"))) != 0) {
+		log_error("gpio %s\n", (sw ? "on" : "off"));
 		return r;
 	}
+	log_debug("gpio%d %s\n", pin, (sw ? "on" : "off"));
 	return 0;
 }
 
@@ -207,6 +231,69 @@ static int gpio_val(int pin, int val)
 	return r;
 }
 
+static int gpio_edge(int pin, trigger_t trig)
+{
+	char msg[] = "risingfalling";
+	int r;
+
+	r = snprintf(msg, sizeof(msg), "%s",
+			((trig == TRIGGER_RISING) ? "rising" :
+			(trig == TRIGGER_FALLING) ? "falling" :
+			(trig == TRIGGER_BOTH) ? "both" :
+			"none"));
+	if (r >= sizeof(msg)) {
+		log_error("generate pin edge\n");
+		return -1;
+	}
+	if ((r = gpio_write(msg, r, "/sys/class/gpio/gpio%d/edge",
+			pin)) != 0) {
+		log_error("gpio edge\n");
+		return -1;
+	}
+	return 0;
+}
+
+static int gpio_poll(int pin, trigger_t trig)
+{
+	char msg[] = "risingfalling";
+	int r;
+
+	if (gpio_open(pin, 0) != 0 || gpio_open(pin, 1) != 0 ||
+			gpio_dir(pin, 0) < 0) {
+		log_error("gpio reopen to input\n");
+		goto finally;
+	}
+
+	if (gpio_edge(pin, trig) != 0) {
+		log_error("gpio edge\n");
+		goto finally;
+	}
+
+	if ((impl.evm = moss_evm_poll_alloc()) == NULL) {
+		log_error("evm: alloc\n");
+		r = -1;
+		goto finally;
+	}
+
+//	if ((impl.fd = open(fn, O_RDONLY)) == -1) {
+//		r = errno;
+//		log_error("open %s, %s(%d)\n", fn, strerror(r), r);
+//		return -1;
+//	}
+//	if ((impl.ev = moss_ev_poll_alloc(impl.rtsp.fd,
+//			MOSS_EV_ACT_RD,
+//			&rtsp_accept, &impl.rtsp)) == NULL) {
+//		log_error("rtsp server: create ev to accept\n");
+//		goto finally;
+//	}
+//	moss_evm_poll_add(impl.evm, impl.rtsp.ev);
+
+
+
+finally:
+	return r;
+}
+
 int main(int argc, char *const *argv)
 {
 	int r;
@@ -214,13 +301,16 @@ int main(int argc, char *const *argv)
 	memset(&impl, 0, sizeof(impl));
 	impl.pin = -1;
 	impl.dir = -1;
+	impl.val = -1;
+	impl.trig = TRIGGER_NONE;
+	impl.fd = -1;
 	{
-		char *opt_short = "-:hp:io:";
+		char *opt_short = "-:hp:i::o::";
 		struct option opt_long[] = {
 			{"help", no_argument, NULL, 'h'},
 			{"pin", required_argument, NULL, 'p'},
-			{"in", no_argument, NULL, 'i'},
-			{"out", required_argument, NULL, 'o'},
+			{"in", optional_argument, NULL, 'i'},
+			{"out", optional_argument, NULL, 'o'},
 			{NULL, 0, NULL, 0},
 		};
 		int opt_op, opt_idx;
@@ -238,24 +328,45 @@ int main(int argc, char *const *argv)
 			}
 			if (opt_op == 'o') {
 				impl.dir = 1;
-				impl.val = strtol(optarg, NULL, 10);
+				if (optarg) impl.val = strtol(optarg, NULL, 10);
 				continue;
 			}
 			if (opt_op == 'i') {
 				impl.dir = 0;
+				if (!optarg) {
+					impl.trig = TRIGGER_NONE;
+				} else if (strcasecmp(optarg, "rising") == 0 ||
+						strcmp(optarg, "1") == 0) {
+					impl.trig = TRIGGER_RISING;
+				} else if (strcasecmp(optarg, "falling") == 0 ||
+						strcmp(optarg, "0") == 0) {
+					impl.trig = TRIGGER_FALLING;
+				} else if (strcasecmp(optarg, "both") == 0 ||
+						strcmp(optarg, "2") == 0) {
+					impl.trig = TRIGGER_BOTH;
+				} else {
+					log_error("unknown trigger\n");
+					help(argv[0]);
+					goto finally;
+				}
 				continue;
 			}
 		}
 	}
 
-	/* pin32 : led on camera module */
-	if ((impl.pin != 32 && (impl.pin < 2 || impl.pin > 27))) {
+	/* PI/pin32 : led on camera module */
+	if (impl.pin < 0 /* || impl.pin > 53 */) {
 		log_error("unknown gpio pin\n");
 		help(argv[0]);
 		goto finally;
 	}
 
-	if (gpio_open(impl.pin) != 0) {
+	if (impl.trig != TRIGGER_NONE) {
+		gpio_poll(impl.pin, impl.trig);
+		goto finally;
+	}
+
+	if (gpio_open(impl.pin, 1) != 0) {
 		log_error("gpio open\n");
 		goto finally;
 	}
