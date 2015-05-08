@@ -468,7 +468,11 @@ openssl_CFGPARAM = --prefix=/ --openssldir=/usr/openssl \
     threads shared enable-deprecated linux-armv4
 
 openssl_dir:
-	git clone https://github.com/openssl/openssl.git $(openssl_DIR)
+	wget -O $(dir $(mpg123_DIR))/openssl-1.0.2-latest.tar.gz \
+	    https://www.openssl.org/source/openssl-1.0.2-latest.tar.gz
+	cd $(dir $(mpg123_DIR)) && \
+	    tar -zxvf openssl-1.0.2-latest.tar.gz && \
+	    ln -sf openssl-1.0.2a openssl
 
 openssl_clean openssl_distclean:
 	if [ -e $(openssl_DIR)/Makefile ]; then \
@@ -490,9 +494,9 @@ openssl openssl_%:
 #------------------------------------
 #
 wpa-supplicant_DIR = $(PROJDIR)/package/wpa-supplicant
-wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) \
-    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -DOPENSSL_USE_DEPRECATED" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) LIBDIR=/lib/ BINDIR=/usr/sbin/ \
+    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libnl3 -DOPENSSL_USE_DEPRECATED" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lnl-3" \
     CC=$(CC) V=1
 
 wpa-supplicant_dir:
