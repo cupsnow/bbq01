@@ -233,6 +233,51 @@ zlib zlib_%:
 
 #------------------------------------
 #
+libnl_DIR = $(PROJDIR)/package/libnl
+libnl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libnl_DIR)
+libnl_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+libnl_dir:
+	wget -O $(dir $(libnl_DIR))/libnl-3.2.25.tar.gz \
+	    "http://www.infradead.org/~tgr/libnl/files/libnl-3.2.25.tar.gz"
+	cd $(dir $(libnl_DIR)) && \
+	    tar -zxvf libnl-3.2.25.tar.gz && \
+	    ln -sf libnl-3.2.25 libnl
+
+libnl_clean libnl_distclean:
+	if [ -e $(libnl_DIR)/Makefile ]; then \
+	  $(libnl_MAKE) $(patsubst libnl,,$(@:libnl_%=%)); \
+	fi
+
+libnl_configure:
+	if [ -x $(libnl_DIR)/autogen.sh ]; then \
+	  echo "Makefile *** Generate configure by autogen.sh..."; \
+	  cd $(libnl_DIR) && ./autogen.sh; \
+	elif [ -e $(libnl_DIR)/configure.ac ]; then \
+	  echo "Makefile *** Generate configure by autoreconf..."; \
+	  cd $(libnl_DIR) && autoreconf -fiv; \
+	fi
+
+libnl_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(libnl_DIR) && ./configure $(libnl_CFGPARAM)
+
+libnl libnl_%:
+	if [ ! -d $(libnl_DIR) ]; then \
+	  $(MAKE) libnl_dir; \
+	fi
+	if [ ! -x $(libnl_DIR)/configure ]; then \
+	  $(MAKE) libnl_configure; \
+	fi; \
+	if [ ! -e $(libnl_DIR)/Makefile ]; then \
+	  $(MAKE) libnl_makefile; \
+	fi
+	$(libnl_MAKE) $(patsubst libnl,,$(@:libnl_%=%))
+
+#------------------------------------
+#
 x264_DIR = $(PROJDIR)/package/x264
 x264_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(x264_DIR)
 x264_CFGENV = CC=$(CC) LD=$(LD)
@@ -411,6 +456,113 @@ mpg123 mpg123_%:
 	  $(MAKE) mpg123_makefile; \
 	fi
 	$(mpg123_MAKE) $(patsubst mpg123,,$(@:mpg123_%=%))
+
+#------------------------------------
+#
+openssl_DIR = $(PROJDIR)/package/openssl
+openssl_MAKE = $(MAKE) INSTALL_PREFIX=$(DESTDIR) -C $(openssl_DIR)
+openssl_CFGENV = CROSS_COMPILE=$(CROSS_COMPILE) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+openssl_CFGPARAM = --prefix=/ --openssldir=/usr/openssl \
+    threads shared enable-deprecated linux-armv4
+
+openssl_dir:
+	git clone https://github.com/openssl/openssl.git $(openssl_DIR)
+
+openssl_clean openssl_distclean:
+	if [ -e $(openssl_DIR)/Makefile ]; then \
+	  $(openssl_MAKE) clean; \
+	fi
+
+openssl_makefile:
+	cd $(openssl_DIR) && $(openssl_CFGENV) ./Configure $(openssl_CFGPARAM)
+
+openssl openssl_%:
+	if [ ! -d $(openssl_DIR) ]; then \
+	  $(MAKE) openssl_dir; \
+	fi
+	if [ ! -e $(openssl_DIR)/Makefile.bak ]; then \
+	  $(MAKE) openssl_makefile; \
+	fi
+	$(openssl_MAKE) $(patsubst openssl,,$(@:openssl_%=%))
+
+#------------------------------------
+#
+wpa-supplicant_DIR = $(PROJDIR)/package/wpa-supplicant
+wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) \
+    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -DOPENSSL_USE_DEPRECATED" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    CC=$(CC) V=1
+
+wpa-supplicant_dir:
+	wget -O $(dir $(wpa-supplicant_DIR))/wpa_supplicant-2.4.tar.gz \
+	    http://w1.fi/releases/wpa_supplicant-2.4.tar.gz
+	cd $(dir $(wpa-supplicant_DIR)) && \
+	    tar -zxvf wpa_supplicant-2.4.tar.gz && \
+	    ln -sf wpa_supplicant-2.4 $(notdir $(wpa-supplicant_DIR))
+
+wpa-supplicant_clean:
+	$(wpa-supplicant_MAKE) -C $(wpa-supplicant_DIR)/wpa_supplicant clean
+
+wpa-supplicant_distclean:
+	$(wpa-supplicant_MAKE) -C $(wpa-supplicant_DIR)/wpa_supplicant clean
+	$(RM) $(wpa-supplicant_DIR)/wpa_supplicant/.config
+
+wpa-supplicant_makefile:
+	$(CP) $(PROJDIR)/config/wpa_supplicant/wpa_supplicant/defconfig \
+	    $(wpa-supplicant_DIR)/wpa_supplicant/.config
+
+wpa-supplicant wpa-supplicant_%:
+	if [ ! -d $(wpa-supplicant_DIR) ]; then \
+	  $(MAKE) wpa-supplicant_dir; \
+	fi
+	if [ ! -e $(wpa-supplicant_DIR)/wpa_supplicant/.config ]; then \
+	  $(MAKE) wpa-supplicant_makefile; \
+	fi
+	$(wpa-supplicant_MAKE) -C $(wpa-supplicant_DIR)/wpa_supplicant \
+	    $(patsubst wpa-supplicant,,$(@:wpa-supplicant_%=%))
+
+#------------------------------------
+#
+sox_DIR = $(PROJDIR)/package/sox
+sox_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(sox_DIR)
+sox_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+sox_dir:
+	git clone git://git.code.sf.net/p/sox/code $(sox_DIR)
+
+sox_clean sox_distclean:
+	if [ -e $(sox_DIR)/Makefile ]; then \
+	  $(sox_MAKE) $(patsubst sox,,$(@:sox_%=%)); \
+	fi
+
+sox_configure:
+	if [ -x $(sox_DIR)/autogen.sh ]; then \
+	  echo "Makefile *** Generate configure by autogen.sh..."; \
+	  cd $(sox_DIR) && ./autogen.sh; \
+	elif [ -e $(sox_DIR)/configure.ac ]; then \
+	  echo "Makefile *** Generate configure by autoreconf..."; \
+	  cd $(sox_DIR) && autoreconf -fiv; \
+	fi
+
+sox_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(sox_DIR) && ./configure $(sox_CFGPARAM)
+
+sox sox_%:
+	if [ ! -d $(sox_DIR) ]; then \
+	  $(MAKE) sox_dir; \
+	fi
+	if [ ! -x $(sox_DIR)/configure ]; then \
+	  $(MAKE) sox_configure; \
+	fi; \
+	if [ ! -e $(sox_DIR)/Makefile ]; then \
+	  $(MAKE) sox_makefile; \
+	fi
+	$(sox_MAKE) $(patsubst sox,,$(@:sox_%=%))
 
 #------------------------------------
 #
