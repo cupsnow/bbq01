@@ -68,6 +68,16 @@ else
 linux_MAKE += LOADADDR=0x80008000
 endif
 
+linux_dir: ;
+ifeq ("$(PLATFORM)","PI2")
+	if [ -d $(linux_DIR) ] ; then \
+	  cd $(linux_DIR); git pull --depth=1; \
+	else \
+	  git clone --depth=1 https://github.com/raspberrypi/linux $(linux_DIR); \
+	fi
+else
+endif
+
 linux_config:
 ifeq ("$(PLATFORM)","PI2")
 	$(linux_MAKE) bcm2709_defconfig
@@ -627,6 +637,18 @@ v4l2info_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
 
 v4l2info v4l2info_%:
 	$(v4l2info_MAKE) $(patsubst v4l2info,,$(@:v4l2info_%=%))
+
+#------------------------------------
+#
+fbinfo_DIR = $(PROJDIR)/package/fbinfo
+fbinfo_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
+    CROSS_COMPILE=$(CROSS_COMPILE) \
+    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    -C $(fbinfo_DIR)
+
+fbinfo fbinfo_%:
+	$(fbinfo_MAKE) $(patsubst fbinfo,,$(@:fbinfo_%=%))
 
 #------------------------------------
 #
