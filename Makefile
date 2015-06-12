@@ -786,6 +786,7 @@ endif
 .PHONY: userland
 
 dist:
+	$(RM) userland obj dist
 ifeq ("$(PLATFORM)","PI2")
 	$(MAKE) linux_uImage
 else
@@ -826,6 +827,11 @@ else
 endif
 
 .PHONY: dist
+
+#------------------------------------
+#
+install: ;
+	
 
 #------------------------------------
 #

@@ -141,8 +141,8 @@ static ex2_video_cap_t* cap_init(const char *dev)
 //		}
 //	}
 
-	impl.cap.w = 640;
-	impl.cap.h = 480;
+	impl.cap.w = MOSS_MIN(1920, impl.fb.vinfo.xres);
+	impl.cap.h = MOSS_MIN(1080, impl.fb.vinfo.yres);
 	impl.cap.fps = (impl.cap.dev->val2.parm.capture.timeperframe.denominator +
 			impl.cap.dev->val2.parm.capture.timeperframe.numerator - 1) /
 			impl.cap.dev->val2.parm.capture.timeperframe.numerator;
