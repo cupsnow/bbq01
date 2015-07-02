@@ -675,7 +675,15 @@ $(PROJDIR)/tool/bin/mkimage:
 # git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi
 #
 firmware-pi_DIR = $(PROJDIR)/package/firmware-pi
+firmware-pi_dir: ;
+	if [ -d $(firmware-pi_DIR) ] ; then \
+	  cd $(firmware-pi_DIR); git pull --depth=1; \
+	else \
+	  git clone --depth=1 https://github.com/raspberrypi/firmware.git $(firmware-pi_DIR); \
+	fi
 
+#------------------------------------
+#
 devlist:
 	$(MKDIR) $(dir $(DEVLIST))
 	echo -n "" > $(DEVLIST)
