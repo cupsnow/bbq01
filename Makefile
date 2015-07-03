@@ -209,7 +209,7 @@ libevent libevent_%:
 zlib_DIR = $(PROJDIR)/package/zlib
 zlib_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(zlib_DIR)
 zlib_CFGENV = prefix=/ CC=$(CROSS_COMPILE)gcc \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 zlib_CFGPARAM =
 
@@ -470,19 +470,20 @@ mpg123 mpg123_%:
 #------------------------------------
 #
 openssl_DIR = $(PROJDIR)/package/openssl
-openssl_MAKE = $(MAKE) INSTALL_PREFIX=$(DESTDIR) -C $(openssl_DIR)
-openssl_CFGENV = CROSS_COMPILE=$(CROSS_COMPILE) \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
-openssl_CFGPARAM = --prefix=/ --openssldir=/usr/openssl \
-    threads shared enable-deprecated linux-armv4
+openssl_MAKE = $(MAKE) INSTALL_PREFIX=$(DESTDIR) \
+    CFLAG="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    EX_LIBS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    -C $(openssl_DIR)
+openssl_CFGPARAM = threads shared zlib-dynamic no-rc5 no-idea enable-deprecated \
+    --prefix=/ --openssldir=/usr/openssl \
+    linux-armv4:$(CC):"$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC"
 
 openssl_dir:
-	wget -O $(dir $(mpg123_DIR))/openssl-1.0.2-latest.tar.gz \
+	wget -O $(dir $(openssl_DIR))/openssl-1.0.2-latest.tar.gz \
 	    https://www.openssl.org/source/openssl-1.0.2-latest.tar.gz
-	cd $(dir $(mpg123_DIR)) && \
+	cd $(dir $(openssl_DIR)) && \
 	    tar -zxvf openssl-1.0.2-latest.tar.gz && \
-	    ln -sf openssl-1.0.2a openssl
+	    ln -sf openssl-1.0.2c openssl
 
 openssl_clean openssl_distclean:
 	if [ -e $(openssl_DIR)/Makefile ]; then \
@@ -505,7 +506,7 @@ openssl openssl_%:
 #
 wpa-supplicant_DIR = $(PROJDIR)/package/wpa-supplicant
 wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) LIBDIR=/lib/ BINDIR=/usr/sbin/ \
-    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libnl3 -DOPENSSL_USE_DEPRECATED" \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libnl3 -DOPENSSL_USE_DEPRECATED" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lnl-3" \
     CC=$(CC) V=1
 
@@ -536,6 +537,39 @@ wpa-supplicant wpa-supplicant_%:
 	fi
 	$(wpa-supplicant_MAKE) -C $(wpa-supplicant_DIR)/wpa_supplicant \
 	    $(patsubst wpa-supplicant,,$(@:wpa-supplicant_%=%))
+
+#------------------------------------
+#
+curl_DIR = $(PROJDIR)/package/curl
+curl_MAKE = $(MAKE) INSTALL_PREFIX=$(DESTDIR) -C $(curl_DIR)
+curl_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` --with-ssl \
+    CFLAGS="$(PLATFORM_CFLAGS)" \
+    CPPFLAGS="-I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+curl_dir:
+	cd $(dir $(curl_DIR)) && \
+	    wget http://curl.haxx.se/download/curl-7.43.0.tar.bz2
+	cd $(dir $(curl_DIR)) && \
+	    tar -jxvf curl-7.43.0.tar.bz2 && \
+	    ln -sf curl-7.43.0 curl
+
+curl_clean curl_distclean:
+	if [ -e $(curl_DIR)/Makefile ]; then \
+	  $(curl_MAKE) $(patsubst curl,,$(@:curl_%=%)); \
+	fi
+
+curl_makefile:
+	cd $(curl_DIR) && $(curl_CFGENV) ./configure $(curl_CFGPARAM)
+
+curl curl_%:
+	if [ ! -d $(curl_DIR) ]; then \
+	  $(MAKE) curl_dir; \
+	fi
+	if [ ! -e $(curl_DIR)/Makefile ]; then \
+	  $(MAKE) curl_makefile; \
+	fi
+	$(curl_MAKE) $(patsubst curl,,$(@:curl_%=%))
 
 #------------------------------------
 #
