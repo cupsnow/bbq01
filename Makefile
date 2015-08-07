@@ -10,8 +10,13 @@ CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
 
 EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH:%=%/bin)
-PLATFORM_CFLAGS = -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=softfp \
-  -mtune=cortex-a7
+
+# codesourcery
+#PLATFORM_CFLAGS = -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=softfp \
+#  -mtune=cortex-a7
+
+# PI2 linaro
+PLATFORM_CFLAGS = -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
 
 export PATH := $(subst $(SPACE),:,$(strip $(EXTRA_PATH)) $(PATH))
 
@@ -245,7 +250,7 @@ zlib zlib_%:
 #
 libnl_DIR = $(PROJDIR)/package/libnl
 libnl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libnl_DIR)
-libnl_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+libnl_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` --disable-cli \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -504,11 +509,13 @@ openssl openssl_%:
 
 #------------------------------------
 #
-wpa-supplicant_DIR = $(PROJDIR)/package/wpa-supplicant
+wpa-supplicant_DIR = $(PROJDIR)/package/wpa_supplicant
+#  -DOPENSSL_USE_DEPRECATED
 wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) LIBDIR=/lib/ BINDIR=/usr/sbin/ \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libnl3 -DOPENSSL_USE_DEPRECATED" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lnl-3" \
-    CC=$(CC) V=1
+    EXTRA_CFLAGS+="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS+="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    CONFIG_LIBNL32=1 LIBNL_INC="$(DESTDIR)/include/libnl3" \
+    CC=$(CC) -C $(wpa-supplicant_DIR)/wpa_supplicant
 
 wpa-supplicant_dir:
 	wget -O $(dir $(wpa-supplicant_DIR))/wpa_supplicant-2.4.tar.gz \
@@ -518,14 +525,14 @@ wpa-supplicant_dir:
 	    ln -sf wpa_supplicant-2.4 $(notdir $(wpa-supplicant_DIR))
 
 wpa-supplicant_clean:
-	$(wpa-supplicant_MAKE) -C $(wpa-supplicant_DIR)/wpa_supplicant clean
+	$(wpa-supplicant_MAKE) clean
 
 wpa-supplicant_distclean:
-	$(wpa-supplicant_MAKE) -C $(wpa-supplicant_DIR)/wpa_supplicant clean
+	$(wpa-supplicant_MAKE) clean
 	$(RM) $(wpa-supplicant_DIR)/wpa_supplicant/.config
 
 wpa-supplicant_makefile:
-	$(CP) $(PROJDIR)/config/wpa_supplicant/wpa_supplicant/defconfig \
+	$(CP) $(wpa-supplicant_DIR)/wpa_supplicant/defconfig \
 	    $(wpa-supplicant_DIR)/wpa_supplicant/.config
 
 wpa-supplicant wpa-supplicant_%:
@@ -535,13 +542,13 @@ wpa-supplicant wpa-supplicant_%:
 	if [ ! -e $(wpa-supplicant_DIR)/wpa_supplicant/.config ]; then \
 	  $(MAKE) wpa-supplicant_makefile; \
 	fi
-	$(wpa-supplicant_MAKE) -C $(wpa-supplicant_DIR)/wpa_supplicant \
+	$(wpa-supplicant_MAKE) \
 	    $(patsubst wpa-supplicant,,$(@:wpa-supplicant_%=%))
 
 #------------------------------------
 #
 curl_DIR = $(PROJDIR)/package/curl
-curl_MAKE = $(MAKE) INSTALL_PREFIX=$(DESTDIR) -C $(curl_DIR)
+curl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(curl_DIR)
 curl_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` --with-ssl \
     CFLAGS="$(PLATFORM_CFLAGS)" \
     CPPFLAGS="-I$(DESTDIR)/include" \
@@ -662,6 +669,54 @@ libmoss libmoss_%:
 
 #------------------------------------
 #
+webme_DIR = $(PROJDIR)/package/webme
+webme_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(webme_DIR)
+webme_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+    --with-pic --with-debug \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+$(addprefix webme_,clean distclean): ;
+	if [ -e $(webme_DIR)/Makefile ]; then \
+	  $(webme_MAKE) $(patsubst webme,,$(@:webme_%=%)); \
+	fi
+
+webme_dir: ;
+#	wget -O $(dir $(webme_DIR))/webme1-1.1.tar.bz2 \
+#	  http://www.intra2net.com/en/developer/webme/download/webme1-1.1.tar.bz2
+#	cd  $(dir $(webme_DIR)) && \
+#	  tar -jxvf webme1-1.1.tar.bz2 && \
+#	  ln -sf webme1-1.1 $(notdir $(webme_DIR))
+
+webme_configure:
+	if [ -x $(webme_DIR)/autogen.sh ]; then \
+	  echo "Makefile *** Generate configure by autogen.sh..."; \
+	  cd $(webme_DIR) && ./autogen.sh; \
+	elif [ -e $(webme_DIR)/configure.ac ]; then \
+	  echo "Makefile *** Generate configure by autoreconf..."; \
+	  cd $(webme_DIR) && autoreconf -fiv; \
+	fi
+
+webme_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(webme_DIR) && $(webme_CFGENV) ./configure $(webme_CFGPARAM)
+
+webme webme_%:
+	if [ ! -d $(webme_DIR) ]; then \
+	  $(MAKE) webme_dir; \
+	fi
+	if [ ! -f $(webme_DIR)/Makefile ]; then \
+	  if [ ! -x $(webme_DIR)/configure ]; then \
+	    $(MAKE) webme_configure; \
+	  fi; \
+	  if [ -x $(webme_DIR)/configure ]; then \
+	    $(MAKE) webme_makefile; \
+	  fi; \
+	fi
+	$(webme_MAKE) $(patsubst webme,,$(@:webme_%=%))
+
+#------------------------------------
+#
 v4l2info_DIR = $(PROJDIR)/package/v4l2info
 v4l2info_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
     CROSS_COMPILE=$(CROSS_COMPILE) \
@@ -726,21 +781,32 @@ devlist:
 
 .PHONY: devlist
 
-so1:
-	$(MKDIR) $(DESTDIR)/lib
-	for i in ld-*.so.* ld-*.so libpthread.so.* libpthread-*.so \
-	    libc.so.* libc-*.so libm.so.* libm-*.so; do \
-	  $(CP) -d $(CROSS_COMPILE_PATH)/arm-none-linux-gnueabi/libc/lib/$$i \
-	      $(DESTDIR)/lib; \
+dist_cp:
+	[ -d $(DESTDIR) ] || $(MKDIR) $(DESTDIR)
+	for i in $(SRCFILE); do \
+	  for j in $(SRCDIR)/$$i; do \
+	    if [ -x $$j ] && [ ! -h $$j ] && [ ! -d $$j ]; then \
+	      $(INSTALL_STRIP) $$j $(DESTDIR); \
+	    elif [ -e $$j ]; then \
+	      $(CP) -d $$j $(DESTDIR)/; \
+	    else \
+	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
+	    fi; \
+	  done; \
 	done
 
+so1:
+	$(MAKE) SRCFILE="ld-*.so.* ld-*.so libpthread.so.* libpthread-*.so" \
+	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
+	    DESTDIR=$(DESTDIR)/lib dist_cp 
+	$(MAKE) SRCFILE="libc.so.* libc-*.so libm.so.* libm-*.so" \
+	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
+	    DESTDIR=$(DESTDIR)/lib dist_cp 
+
 so2:
-	$(MKDIR) $(DESTDIR)/lib
-	for i in libgcc_s.so.1 libdl.so.* libdl-*.so \
-	    librt.so.* librt-*.so; do \
-	  $(CP) -d $(CROSS_COMPILE_PATH)/arm-none-linux-gnueabi/libc/lib/$$i \
-	      $(DESTDIR)/lib/; \
-	done
+	$(MAKE) SRCFILE="libgcc_s.so.1 libdl.so.* libdl-*.so librt.so.* librt-*.so" \
+	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
+	    DESTDIR=$(DESTDIR)/lib dist_cp 
 
 prebuilt:
 	$(MKDIR) $(DESTDIR)
@@ -762,6 +828,8 @@ initramfs: tool
 
 .PHONY: initramfs
 
+test:;
+
 userland: tool
 	$(MAKE) linux_headers_install
 	$(MAKE) busybox
@@ -778,52 +846,60 @@ else
 	$(MAKE) DESTDIR=$(PROJDIR)/userland \
 	    PREBUILT="$(PROJDIR)/prebuilt/userland/*" prebuilt
 endif
+	$(MAKE) zlib_install libmoss_install libnl_install openssl_install
+	$(MAKE) SRCFILE="libz.so libz.so.* libmoss.so libmoss.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="libnl-*.so libnl-*.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="openssl" \
+	    SRCDIR=$(DESTDIR)/usr DESTDIR=$(PROJDIR)/userland/usr \
+	    dist_cp
+	$(MAKE) SRCFILE="openssl" \
+	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+	    dist_cp
+	$(MAKE) curl_install
+	$(MAKE) SRCFILE="libcurl.so libcurl.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="curl" \
+	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+	    dist_cp
 	$(MAKE) libevent_install libjpeg-turbo_install json-c_install \
-	    x264_install zlib_install libmoss_install \
-	    v4l2info_install gpioctl-pi_install mpg123_install
-	$(MKDIR) $(PROJDIR)/userland/lib
-	for i in libevent_core.so libevent_core-*.so.* \
-	    libevent_extra.so libevent_extra-*.so.* \
-	    libevent_pthreads.so libevent_pthreads-*.so.* \
-	    libevent.so libevent-*.so.* \
-	    libjpeg.so libjpeg.so.* libturbojpeg.so libturbojpeg.so.* \
-	    libjson-c.so libjson-c.so.* libx264.so libx264.so.* \
-	    libz.so libz.so.* libmoss.so libmoss.so.* \
-	    libmpg123.so libmpg123.so.*; do \
-	  for j in $(DESTDIR)/lib/$$i; do \
-	    if [ -x $$j ]; then \
-	      $(INSTALL_STRIP) $$j $(PROJDIR)/userland/lib; \
-	    elif [ -e $$j ]; then \
-	      $(CP) -d $$j $(PROJDIR)/userland/lib/; \
-	    else \
-	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
-	    fi; \
-	  done; \
-	done
-	$(MKDIR) $(PROJDIR)/userland/bin
-	for i in mpg123; do \
-	  for j in $(DESTDIR)/bin/$$i; do \
-	    if [ -x $$j ]; then \
-	      $(INSTALL_STRIP) $$j $(PROJDIR)/userland/bin; \
-	    elif [ -e $$j ]; then \
-	      $(CP) -d $$j $(PROJDIR)/userland/bin/; \
-	    else \
-	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
-	    fi; \
-	  done; \
-	done
-	$(MKDIR) $(PROJDIR)/userland/usr/bin
-	for i in gpioctl v4l2info; do \
-	  for j in $(DESTDIR)/usr/bin/$$i; do \
-	    if [ -x $$j ]; then \
-	      $(INSTALL_STRIP) $$j $(PROJDIR)/userland/usr/bin; \
-	    elif [ -e $$j ]; then \
-	      $(CP) -d $$j $(PROJDIR)/userland/usr/bin/; \
-	    else \
-	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
-	    fi; \
-	  done; \
-	done
+	    x264_install mpg123_install v4l2info_install
+	$(MAKE) SRCFILE="libevent.so libevent-*.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="libturbojpeg.so libturbojpeg.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="libjson-c.so libjson-c.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="libx264.so libx264.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="libmpg123.so libmpg123.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="mpg123" \
+	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+	    dist_cp
+	$(MAKE) SRCFILE="v4l2info" \
+	    SRCDIR=$(DESTDIR)/usr/bin DESTDIR=$(PROJDIR)/userland/usr/bin \
+	    dist_cp
+ifeq ("$(PLATFORM)","PI2")
+	$(MAKE) gpioctl-pi_install
+	$(MAKE) SRCFILE="gpioctl" \
+	    SRCDIR=$(DESTDIR)/usr/bin DESTDIR=$(PROJDIR)/userland/usr/bin \
+	    dist_cp
+else
+endif
+	$(MAKE) wpa-supplicant_install
+	$(MAKE) SRCFILE="wpa_*" \
+	    SRCDIR=$(DESTDIR)/usr/sbin DESTDIR=$(PROJDIR)/userland/usr/sbin \
+	    dist_cp
 
 .PHONY: userland
 
