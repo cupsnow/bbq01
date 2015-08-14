@@ -46,6 +46,31 @@ static struct {
 
 } impl;
 
+static int hx711_read(void)
+{
+#define WAIT_MAX 100
+	int cnt, val;
+
+	gpio_set_value(hx711_clk, 0);
+	udelay(1);
+
+	for (cnt = 0; cnt < WAIT_MAX; cnt++) {
+		if (!gpio_get_value(hx711_dio)) break;
+		udelay(1);
+	}
+	if (cnt >= WAIT_MAX) return -1;
+
+	val = 0;
+	for (cnt = 0; cnt < 25; cnt++) {
+		gpio_set_value(hx711_clk, 1);
+		udelay(1);
+		gpio_set_value(hx711_clk, 0);
+		val = (val << 1) | (!!gpio_get_value(hx711_dio));
+		udelay(1);
+	}
+	return val;
+}
+
 static int dev_open(struct inode *ip, struct file *fp)
 {
 	int r;
@@ -81,10 +106,7 @@ static int dev_release(struct inode *ip, struct file *fp)
 static ssize_t dev_read(struct file *fp, char *buf, size_t sz,
 		loff_t *sf)
 {
-	log_debug("enter\n");
-
-	gpio_set_value(hx711_clk, 0);
-
+	log_debug("hx711: %d\n", hx711_read());
 	return 0;
 }
 
@@ -92,9 +114,6 @@ static ssize_t dev_write(struct file *fp, const char *buf, size_t sz,
 		loff_t *sf)
 {
 	log_debug("enter\n");
-
-	gpio_set_value(hx711_clk, 1);
-
 	return sz;
 }
 
