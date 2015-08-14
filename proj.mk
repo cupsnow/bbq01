@@ -39,6 +39,7 @@ CP = cp -R
 #
 MAKEPARAM = PROJDIR="$(PROJDIR)" DESTDIR="$(DESTDIR)" 
 DEPFLAGS = -MM -MF $(call DEP,$(1)) -MT $(1)
+TOKEN = $(word $(1),$(subst _, ,$(2)))
 #CFLAGS = -I$(PWD)/include -I$(DESTDIR)/include
 #LDFLAGS = -I$(PWD)/lib -I$(DESTDIR)/lib
 #ARFLAGS = rcs
@@ -55,6 +56,42 @@ COLOR_CYAN = $(call _COLOR,36)
 COLOR_YELLOW = $(call _COLOR,33)
 COLOR_MAGENTA = $(call _COLOR,35)
 COLOR_GRAY = $(call _COLOR,37)
+
+#------------------------------------
+#
+#dist_cp:
+#	@[ -d $(DESTDIR) ] || $(MKDIR) $(DESTDIR)
+#	@for i in $(SRCFILE); do \
+#	  for j in $(SRCDIR)/$$i; do \
+#	    if [ -x $$j ] && [ ! -h $$j ] && [ ! -d $$j ]; then \
+#	      echo "$(COLOR_GREEN)installing(strip) $$j$(COLOR)"; \
+#	      $(INSTALL_STRIP) $$j $(DESTDIR); \
+#	    elif [ -e $$j ]; then \
+#	      echo "$(COLOR_GREEN)installing(cp) $$j$(COLOR)"; \
+#	      $(CP) -d $$j $(DESTDIR)/; \
+#	    else \
+#	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
+#	    fi; \
+#	  done; \
+#	done
+
+#------------------------------------
+#
+#ifeq ("$(KERNELRELEASE)","")
+#PWD := $(abspath .)
+#KDIR ?= $(lastword $(wildcard $(DESTDIR)/lib/modules/**/build))
+#
+#all: modules
+#
+#%:
+#	$(MAKE) -C $(KDIR) M=$(PWD) $@
+#
+##------------------------------------
+##
+#else
+#obj-m := hx711.o
+#
+#endif
 
 #------------------------------------
 #

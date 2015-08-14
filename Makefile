@@ -65,9 +65,12 @@ else
 linux_DIR = $(PROJDIR)/package/linux-3.16.2
 endif
 
-linux_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
+linux_MAKEPARAM = CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
     INSTALL_HDR_PATH=$(DESTDIR)/usr INSTALL_MOD_PATH=$(DESTDIR) \
-    -C $(linux_DIR)
+    KDIR=$(linux_DIR)
+
+linux_MAKE = $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR)
+
 ifeq ("$(PLATFORM)","PI2")
 else
 linux_MAKE += LOADADDR=0x80008000
@@ -90,7 +93,7 @@ else
 	$(linux_MAKE) bbq01_defconfig #multi_v7_defconfig
 endif
 
-linux_clean linux_distclean linux_mrproper linux_clobber:
+linux_clean linux_distclean linux_mrproper linux_clobber linux_oldconfig:
 	$(linux_MAKE) $(patsubst linux,,$(@:linux_%=%))
 
 linux linux_%: tool
@@ -245,6 +248,54 @@ zlib zlib_%:
 	  fi; \
 	fi
 	$(zlib_MAKE) $(patsubst zlib,,$(@:zlib_%=%))
+
+#------------------------------------
+#
+expat_DIR = $(PROJDIR)/package/expat
+expat_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(expat_DIR)
+expat_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+    --with-pic \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+$(addprefix expat_,clean distclean): ;
+	if [ -e $(expat_DIR)/Makefile ]; then \
+	  $(expat_MAKE) $(patsubst expat,,$(@:expat_%=%)); \
+	fi
+
+expat_dir: ;
+	wget -O $(dir $(expat_DIR))/expat-2.1.0.tar.gz \
+	    http://sourceforge.net/projects/expat/files/expat/2.1.0/expat-2.1.0.tar.gz
+	cd  $(dir $(expat_DIR)) && \
+	  tar -zxvf expat-2.1.0.tar.gz && \
+	  ln -sf expat-2.1.0 $(notdir $(expat_DIR))
+
+expat_configure:
+	if [ -x $(expat_DIR)/autogen.sh ]; then \
+	  echo "Makefile *** Generate configure by autogen.sh..."; \
+	  cd $(expat_DIR) && ./autogen.sh; \
+	elif [ -e $(expat_DIR)/configure.ac ]; then \
+	  echo "Makefile *** Generate configure by autoreconf..."; \
+	  cd $(expat_DIR) && autoreconf -fiv; \
+	fi
+
+expat_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(expat_DIR) && $(expat_CFGENV) ./configure $(expat_CFGPARAM)
+
+expat expat_%:
+	if [ ! -d $(expat_DIR) ]; then \
+	  $(MAKE) expat_dir; \
+	fi
+	if [ ! -f $(expat_DIR)/Makefile ]; then \
+	  if [ ! -x $(expat_DIR)/configure ]; then \
+	    $(MAKE) expat_configure; \
+	  fi; \
+	  if [ -x $(expat_DIR)/configure ]; then \
+	    $(MAKE) expat_makefile; \
+	  fi; \
+	fi
+	$(expat_MAKE) $(patsubst expat,,$(@:expat_%=%))
 
 #------------------------------------
 #
@@ -717,6 +768,54 @@ webme webme_%:
 
 #------------------------------------
 #
+dbus_DIR = $(PROJDIR)/package/dbus
+dbus_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(dbus_DIR)
+dbus_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+    --with-pic --enable-abstract-sockets \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+$(addprefix dbus_,clean distclean): ;
+	if [ -e $(dbus_DIR)/Makefile ]; then \
+	  $(dbus_MAKE) $(patsubst dbus,,$(@:dbus_%=%)); \
+	fi
+
+dbus_dir: ;
+	wget -O $(dir $(dbus_DIR))/dbus-1.8.20.tar.gz \
+	    http://dbus.freedesktop.org/releases/dbus/dbus-1.8.20.tar.gz
+	cd  $(dir $(dbus_DIR)) && \
+	  tar -zxvf dbus-1.8.20.tar.gz && \
+	  ln -sf dbus-1.8.20 $(notdir $(dbus_DIR))
+
+dbus_configure:
+	if [ -x $(dbus_DIR)/autogen.sh ]; then \
+	  echo "Makefile *** Generate configure by autogen.sh..."; \
+	  cd $(dbus_DIR) && ./autogen.sh; \
+	elif [ -e $(dbus_DIR)/configure.ac ]; then \
+	  echo "Makefile *** Generate configure by autoreconf..."; \
+	  cd $(dbus_DIR) && autoreconf -fiv; \
+	fi
+
+dbus_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(dbus_DIR) && $(dbus_CFGENV) ./configure $(dbus_CFGPARAM)
+
+dbus dbus_%:
+	if [ ! -d $(dbus_DIR) ]; then \
+	  $(MAKE) dbus_dir; \
+	fi
+	if [ ! -f $(dbus_DIR)/Makefile ]; then \
+	  if [ ! -x $(dbus_DIR)/configure ]; then \
+	    $(MAKE) dbus_configure; \
+	  fi; \
+	  if [ -x $(dbus_DIR)/configure ]; then \
+	    $(MAKE) dbus_makefile; \
+	  fi; \
+	fi
+	$(dbus_MAKE) $(patsubst dbus,,$(@:dbus_%=%))
+
+#------------------------------------
+#
 v4l2info_DIR = $(PROJDIR)/package/v4l2info
 v4l2info_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
     CROSS_COMPILE=$(CROSS_COMPILE) \
@@ -773,6 +872,24 @@ firmware-pi_dir: ;
 
 #------------------------------------
 #
+dist_cp:
+	@[ -d $(DESTDIR) ] || $(MKDIR) $(DESTDIR)
+	@for i in $(SRCFILE); do \
+	  for j in $(SRCDIR)/$$i; do \
+	    if [ -x $$j ] && [ ! -h $$j ] && [ ! -d $$j ]; then \
+	      echo "$(COLOR_GREEN)installing(strip) $$j$(COLOR)"; \
+	      $(INSTALL_STRIP) $$j $(DESTDIR); \
+	    elif [ -e $$j ]; then \
+	      echo "$(COLOR_GREEN)installing(cp) $$j$(COLOR)"; \
+	      $(CP) -d $$j $(DESTDIR)/; \
+	    else \
+	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
+	    fi; \
+	  done; \
+	done
+
+#------------------------------------
+#
 devlist:
 	$(MKDIR) $(dir $(DEVLIST))
 	echo -n "" > $(DEVLIST)
@@ -780,20 +897,6 @@ devlist:
 	echo "nod /dev/console 0600 0 0 c 5 1" >> $(DEVLIST)
 
 .PHONY: devlist
-
-dist_cp:
-	[ -d $(DESTDIR) ] || $(MKDIR) $(DESTDIR)
-	for i in $(SRCFILE); do \
-	  for j in $(SRCDIR)/$$i; do \
-	    if [ -x $$j ] && [ ! -h $$j ] && [ ! -d $$j ]; then \
-	      $(INSTALL_STRIP) $$j $(DESTDIR); \
-	    elif [ -e $$j ]; then \
-	      $(CP) -d $$j $(DESTDIR)/; \
-	    else \
-	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
-	    fi; \
-	  done; \
-	done
 
 so1:
 	$(MAKE) SRCFILE="ld-*.so.* ld-*.so libpthread.so.* libpthread-*.so" \
@@ -827,8 +930,6 @@ initramfs: tool
 	    -d $(PROJDIR)/initramfs.cpio.gz $(PROJDIR)/initramfs
 
 .PHONY: initramfs
-
-test:;
 
 userland: tool
 	$(MAKE) linux_headers_install
@@ -945,6 +1046,16 @@ else
 endif
 
 .PHONY: dist
+
+#------------------------------------
+#
+test_DIR = $(call TOKEN,1,$(1))/$(call TOKEN,2,$(1))
+test_TARGET_FILTER = $(call TOKEN,1,$(1))_$(call TOKEN,2,$(1))
+test_TARGET = $(patsubst $(call test_TARGET_FILTER,$(1)),,$(1:$(call test_TARGET_FILTER,$(1))_%=%))
+
+test_%:
+	$(MAKE) $(MAKEPARAM) $(linux_MAKEPARAM) \
+	    -C $(PROJDIR)/$(call test_DIR,$@) $(call test_TARGET,$@)
 
 #------------------------------------
 #
