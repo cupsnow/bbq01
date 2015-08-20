@@ -31,6 +31,17 @@ all: ;
 
 #------------------------------------
 #
+env.sh: ;
+	$(RM) $@; touch $@ && chmod +x $@ 
+	echo "#!/bin/sh" >> $@
+	echo "export CROSS_COMPILE="'"'"$(CROSS_COMPILE)"'"' >> $@
+	echo "export PATH="'"'"$(PATH)"'"' >> $@
+	echo "export PLATFORM_CFLAGS="'"'"$(PLATFORM_CFLAGS)"'"' >> $@
+	echo "export PLATFORM="'"'"$(PLATFORM)"'"' >> $@
+
+.PHONY: env.sh
+#------------------------------------
+#
 tool: ;
 
 .PHONY: tool
@@ -48,18 +59,17 @@ else
 endif
 
 uboot_clean uboot_distclean:
-	$(uboot_MAKE) $(patsubst uboot,,$(@:uboot_%=%))
+	$(uboot_MAKE) $(patsubst _%,%,$(@:uboot%=%))
 
 uboot uboot_%:
 	if [ ! -f $(uboot_DIR)/include/config.mk ]; then \
 	  $(MAKE) uboot_config; \
 	fi
-	$(uboot_MAKE) $(patsubst uboot,,$(@:uboot_%=%))
+	$(uboot_MAKE) $(patsubst _%,%,$(@:uboot%=%))
 
 #------------------------------------
 #
 ifeq ("$(PLATFORM)","PI2")
-# git clone --depth=1 https://github.com/raspberrypi/linux linux-pi
 linux_DIR = $(PROJDIR)/package/linux-pi
 else
 linux_DIR = $(PROJDIR)/package/linux-3.16.2
@@ -94,13 +104,21 @@ else
 endif
 
 linux_clean linux_distclean linux_mrproper linux_clobber linux_oldconfig:
-	$(linux_MAKE) $(patsubst linux,,$(@:linux_%=%))
+	$(linux_MAKE) $(patsubst _%,,$(@:linux%=%))
 
 linux linux_%: tool
 	if [ ! -f $(linux_DIR)/.config ]; then \
 	  $(MAKE) linux_config; \
 	fi
-	$(linux_MAKE) $(patsubst linux,,$(@:linux_%=%))
+	$(linux_MAKE) $(patsubst _%,,$(@:linux%=%))
+
+#------------------------------------
+#
+hx711-drv_DIR = $(PROJDIR)/package/hx711-drv-pi
+
+hx711-drv hx711-drv%:
+	$(MAKE) $(MAKEPARAM) $(linux_MAKEPARAM) \
+	    -C $(hx711-drv_DIR) $(patsubst _%,%,$(@:hx711-drv%=%))
 
 #------------------------------------
 #
@@ -113,44 +131,68 @@ busybox_config:
 	$(busybox_MAKE) defconfig
 
 busybox_clean busybox_distclean:
-	$(busybox_MAKE) $(patsubst busybox,,$(@:busybox_%=%))
+	$(busybox_MAKE) $(patsubst _%,%,$(@:busybox%=%))
 
 busybox busybox_%:
 	if [ ! -f $(busybox_DIR)/.config ]; then \
 	  $(MAKE) busybox_config; \
 	fi
-	$(busybox_MAKE) $(patsubst busybox,,$(@:busybox_%=%))
+	$(busybox_MAKE) $(patsubst _%,%,$(@:busybox%=%))
 
 #------------------------------------
 #
+zlib_DIR = $(PROJDIR)/package/zlib
+zlib_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(zlib_DIR)
+zlib_CFGENV = prefix= CC=$(CROSS_COMPILE)gcc \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+zlib_CFGPARAM =
+
+zlib_dir:
+	wget -O $(dir $(zlib_DIR))/zlib-1.2.8.tar.xz \
+	    "http://zlib.net/zlib-1.2.8.tar.xz"
+	cd $(dir $(zlib_DIR)) && \
+	  tar -Jxvf zlib-1.2.8.tar.xz && \
+	  ln -sf zlib-1.2.8 $(notdir $(zlib_DIR))
+
+zlib_clean zlib_distclean:
+	if [ -e $(zlib_DIR)/Makefile ]; then \
+	  $(zlib_MAKE) $(patsubst _%,,$(@:zlib%=%)); \
+	fi
+
+zlib_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(zlib_DIR) && \
+	  $(zlib_CFGENV) ./configure $(zlib_CFGPARAM)
+
+zlib zlib_%:
+	if [ ! -d $(zlib_DIR) ]; then \
+	  $(MAKE) zlib_dir; \
+	fi
+	if [ ! -e $(zlib_DIR)/configure.log ]; then \
+	  $(MAKE) zlib_makefile; \
+	fi
+	$(zlib_MAKE) $(patsubst _%,,$(@:zlib%=%))
+
+#------------------------------------
+# ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes
+#
 json-c_DIR = $(PROJDIR)/package/json-c
 json-c_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(json-c_DIR)
-json-c_CFGENV = ac_cv_func_malloc_0_nonnull=yes \
-    ac_cv_func_realloc_0_nonnull=yes
-json-c_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+json-c_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 json-c_dir:
-	wget -O $(dir $(json-c_DIR))/json-c-0.12.tar.gz \
-	    https://s3.amazonaws.com/json-c_releases/releases/json-c-0.12.tar.gz
-	cd $(dir $(json-c_DIR)) && \
-	    tar -zxvf json-c-0.12.tar.gz && \
-	    ln -sf json-c-0.12 $(notdir $(json-c_DIR))
+	git clone --depth=1 https://github.com/json-c/json-c.git $(json-c_DIR)
 
 json-c_clean json-c_distclean:
 	if [ -e $(json-c_DIR)/Makefile ]; then \
-	  $(json-c_MAKE) $(patsubst json-c,,$(@:json-c_%=%)); \
+	  $(json-c_MAKE) $(patsubst _%,%,$(@:json-c%=%)); \
 	fi
 
 json-c_configure:
-	if [ -x $(json-c_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(json-c_DIR) && ./autogen.sh; \
-	elif [ -e $(json-c_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(json-c_DIR) && autoreconf -fiv; \
-	fi
+	cd $(json-c_DIR) && ./autogen.sh;
 
 json-c_makefile:
 	cd $(json-c_DIR) && $(json-c_CFGENV) ./configure $(json-c_CFGPARAM)
@@ -165,13 +207,13 @@ json-c json-c_%:
 	if [ ! -e $(json-c_DIR)/Makefile ]; then \
 	  $(MAKE) json-c_makefile; \
 	fi
-	$(json-c_MAKE) $(patsubst json-c,,$(@:json-c_%=%))
+	$(json-c_MAKE) $(patsubst _%,%,$(@:json-c%=%))
 
 #------------------------------------
 #
 libevent_DIR = $(PROJDIR)/package/libevent
 libevent_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libevent_DIR)
-libevent_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+libevent_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -179,129 +221,31 @@ libevent_dir:
 	wget -O $(dir $(libevent_DIR))/libevent-2.0.22-stable.tar.gz \
 	    https://sourceforge.net/projects/levent/files/libevent/libevent-2.0/libevent-2.0.22-stable.tar.gz
 	cd $(dir $(libevent_DIR)) && \
-	    tar -zxvf libevent-2.0.22-stable.tar.gz && \
-	    ln -sf libevent-2.0.22-stable libevent
+	  tar -zxvf libevent-2.0.22-stable.tar.gz && \
+	  ln -sf libevent-2.0.22-stable $(notdir $(libevent_DIR))
 
 libevent_clean libevent_distclean:
 	if [ -e $(libevent_DIR)/Makefile ]; then \
-	  $(libevent_MAKE) $(patsubst libevent,,$(@:libevent_%=%)); \
-	fi
-
-libevent_configure:
-	if [ -x $(libevent_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(libevent_DIR) && ./autogen.sh; \
-	elif [ -e $(libevent_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(libevent_DIR) && autoreconf -fiv; \
+	  $(libevent_MAKE) $(patsubst _%,%,$(@:libevent%=%)); \
 	fi
 
 libevent_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(libevent_DIR) && ./configure $(libevent_CFGPARAM)
 
 libevent libevent_%:
 	if [ ! -d $(libevent_DIR) ]; then \
 	  $(MAKE) libevent_dir; \
 	fi
-	if [ ! -x $(libevent_DIR)/configure ]; then \
-	  $(MAKE) libevent_configure; \
-	fi; \
 	if [ ! -e $(libevent_DIR)/Makefile ]; then \
 	  $(MAKE) libevent_makefile; \
 	fi
-	$(libevent_MAKE) $(patsubst libevent,,$(@:libevent_%=%))
-
-#------------------------------------
-#
-zlib_DIR = $(PROJDIR)/package/zlib
-zlib_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(zlib_DIR)
-zlib_CFGENV = prefix=/ CC=$(CROSS_COMPILE)gcc \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
-zlib_CFGPARAM =
-
-zlib_dir:
-	wget -O $(dir $(zlib_DIR))/zlib-1.2.8.tar.xz \
-	    "http://zlib.net/zlib-1.2.8.tar.xz"
-	cd $(dir $(zlib_DIR)) && \
-	    tar -Jxvf zlib-1.2.8.tar.xz && \
-	    ln -sf zlib-1.2.8 zlib
-
-zlib_clean zlib_distclean:
-	if [ -e $(zlib_DIR)/Makefile ]; then \
-	  $(zlib_MAKE) $(patsubst zlib,,$(@:zlib_%=%)); \
-	fi
-
-zlib_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
-	cd $(zlib_DIR) && \
-	  $(zlib_CFGENV) ./configure $(zlib_CFGPARAM)
-
-zlib zlib_%:
-	if [ ! -d $(zlib_DIR) ]; then \
-	  $(MAKE) zlib_dir; \
-	fi
-	if [ ! -e $(zlib_DIR)/configure.log ]; then \
-	  if [ -x $(zlib_DIR)/configure ]; then \
-	    $(MAKE) zlib_makefile; \
-	  fi; \
-	fi
-	$(zlib_MAKE) $(patsubst zlib,,$(@:zlib_%=%))
-
-#------------------------------------
-#
-expat_DIR = $(PROJDIR)/package/expat
-expat_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(expat_DIR)
-expat_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
-    --with-pic \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
-
-$(addprefix expat_,clean distclean): ;
-	if [ -e $(expat_DIR)/Makefile ]; then \
-	  $(expat_MAKE) $(patsubst expat,,$(@:expat_%=%)); \
-	fi
-
-expat_dir: ;
-	wget -O $(dir $(expat_DIR))/expat-2.1.0.tar.gz \
-	    http://sourceforge.net/projects/expat/files/expat/2.1.0/expat-2.1.0.tar.gz
-	cd  $(dir $(expat_DIR)) && \
-	  tar -zxvf expat-2.1.0.tar.gz && \
-	  ln -sf expat-2.1.0 $(notdir $(expat_DIR))
-
-expat_configure:
-	if [ -x $(expat_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(expat_DIR) && ./autogen.sh; \
-	elif [ -e $(expat_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(expat_DIR) && autoreconf -fiv; \
-	fi
-
-expat_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
-	cd $(expat_DIR) && $(expat_CFGENV) ./configure $(expat_CFGPARAM)
-
-expat expat_%:
-	if [ ! -d $(expat_DIR) ]; then \
-	  $(MAKE) expat_dir; \
-	fi
-	if [ ! -f $(expat_DIR)/Makefile ]; then \
-	  if [ ! -x $(expat_DIR)/configure ]; then \
-	    $(MAKE) expat_configure; \
-	  fi; \
-	  if [ -x $(expat_DIR)/configure ]; then \
-	    $(MAKE) expat_makefile; \
-	  fi; \
-	fi
-	$(expat_MAKE) $(patsubst expat,,$(@:expat_%=%))
+	$(libevent_MAKE) $(patsubst _%,%,$(@:libevent%=%))
 
 #------------------------------------
 #
 libnl_DIR = $(PROJDIR)/package/libnl
 libnl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libnl_DIR)
-libnl_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` --disable-cli \
+libnl_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) --disable-cli \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -309,114 +253,78 @@ libnl_dir:
 	wget -O $(dir $(libnl_DIR))/libnl-3.2.25.tar.gz \
 	    "http://www.infradead.org/~tgr/libnl/files/libnl-3.2.25.tar.gz"
 	cd $(dir $(libnl_DIR)) && \
-	    tar -zxvf libnl-3.2.25.tar.gz && \
-	    ln -sf libnl-3.2.25 libnl
+	  tar -zxvf libnl-3.2.25.tar.gz && \
+	  ln -sf libnl-3.2.25 $(notdir $(libnl_DIR))
 
 libnl_clean libnl_distclean:
 	if [ -e $(libnl_DIR)/Makefile ]; then \
-	  $(libnl_MAKE) $(patsubst libnl,,$(@:libnl_%=%)); \
-	fi
-
-libnl_configure:
-	if [ -x $(libnl_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(libnl_DIR) && ./autogen.sh; \
-	elif [ -e $(libnl_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(libnl_DIR) && autoreconf -fiv; \
+	  $(libnl_MAKE) $(patsubst _%,%,$(@:libnl%=%)); \
 	fi
 
 libnl_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(libnl_DIR) && ./configure $(libnl_CFGPARAM)
 
 libnl libnl_%:
 	if [ ! -d $(libnl_DIR) ]; then \
 	  $(MAKE) libnl_dir; \
 	fi
-	if [ ! -x $(libnl_DIR)/configure ]; then \
-	  $(MAKE) libnl_configure; \
-	fi; \
 	if [ ! -e $(libnl_DIR)/Makefile ]; then \
 	  $(MAKE) libnl_makefile; \
 	fi
-	$(libnl_MAKE) $(patsubst libnl,,$(@:libnl_%=%))
+	$(libnl_MAKE) $(patsubst _%,%,$(@:libnl%=%))
 
 #------------------------------------
 #
 x264_DIR = $(PROJDIR)/package/x264
 x264_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(x264_DIR)
 x264_CFGENV = CC=$(CC) LD=$(LD)
-x264_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+x264_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     $(addprefix --enable-,pic shared static) \
     $(addprefix --disable-,opencl avs swscale lavf ffms gpac lsmash) \
     --extra-cflags="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     --extra-ldflags="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 x264_dir:
-	git clone git://git.videolan.org/x264.git $(x264_DIR)
+	git clone --depth=1 git://git.videolan.org/x264.git $(x264_DIR)
 
 x264_clean x264_distclean:
 	if [ -e $(x264_DIR)/config.mak ]; then \
-	  $(x264_MAKE) $(patsubst x264,,$(@:x264_%=%)); \
-	fi
-
-x264_configure:
-	if [ -x $(x264_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(x264_DIR) && ./autogen.sh; \
-	elif [ -e $(x264_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(x264_DIR) && autoreconf -fiv; \
+	  $(x264_MAKE) $(patsubst _%,%,$(@:x264%=%)); \
 	fi
 
 x264_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(x264_DIR) && $(x264_CFGENV) ./configure $(x264_CFGPARAM)
 
 x264 x264_%:
 	if [ ! -d $(x264_DIR) ]; then \
 	  $(MAKE) x264_dir; \
 	fi
-	if [ ! -x $(x264_DIR)/configure ]; then \
-	  $(MAKE) x264_configure; \
-	fi;
 	if [ ! -e $(x264_DIR)/config.mak ]; then \
 	  $(MAKE) x264_makefile; \
-	fi;
-	$(x264_MAKE) $(patsubst x264,,$(@:x264_%=%))
+	fi
+	$(x264_MAKE) $(patsubst _%,%,$(@:x264%=%))
 
 #------------------------------------
 #
 libjpeg-turbo_DIR = $(PROJDIR)/package/libjpeg-turbo
 libjpeg-turbo_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libjpeg-turbo_DIR)
-libjpeg-turbo_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
-  CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-  LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+libjpeg-turbo_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 libjpeg-turbo_dir:
-	wget -O $(dir $(libjpeg-turbo_DIR))/libjpeg-turbo-1.3.90.tar.gz \
-	    "http://downloads.sourceforge.net/project/libjpeg-turbo/1.3.90 (1.4 beta1)/libjpeg-turbo-1.3.90.tar.gz?r=http://sourceforge.net/projects/libjpeg-turbo/files/1.3.90%20%281.4%20beta1%29/&ts=1414222912&use_mirror=jaist"
+	wget -O $(dir $(libjpeg-turbo_DIR))/libjpeg-turbo-1.4.1.tar.gz \
+	    http://downloads.sourceforge.net/project/libjpeg-turbo/1.4.1/libjpeg-turbo-1.4.1.tar.gz
 	cd $(dir $(libjpeg-turbo_DIR)) && \
-	    tar -zxvf libjpeg-turbo-1.3.90.tar.gz && \
-	    ln -sf libjpeg-turbo-1.3.90 libjpeg-turbo
+	  tar -zxvf libjpeg-turbo-1.4.1.tar.gz && \
+	  ln -sf libjpeg-turbo-1.4.1 $(notdir $(libjpeg-turbo_DIR))
 
 $(addprefix libjpeg-turbo_,clean distclean): ;
 	if [ -e $(libjpeg-turbo_DIR)/Makefile ]; then \
-	  $(libjpeg-turbo_MAKE) $(patsubst libjpeg-turbo,,$(@:libjpeg-turbo_%=%)); \
-	fi
-
-libjpeg-turbo_configure:
-	if [ -x $(libjpeg-turbo_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(libjpeg-turbo_DIR) && ./autogen.sh; \
-	elif [ -e $(libjpeg-turbo_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(libjpeg-turbo_DIR) && autoreconf -fiv; \
+	  $(libjpeg-turbo_MAKE) $(patsubst _%,%,$(@:libjpeg-turbo%=%)); \
 	fi
 
 libjpeg-turbo_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(libjpeg-turbo_DIR) && ./configure $(libjpeg-turbo_CFGPARAM)
 
 libjpeg-turbo libjpeg-turbo_%:
@@ -424,25 +332,20 @@ libjpeg-turbo libjpeg-turbo_%:
 	  $(MAKE) libjpeg-turbo_dir; \
 	fi
 	if [ ! -e $(libjpeg-turbo_DIR)/Makefile ]; then \
-	  if [ ! -x $(libjpeg-turbo_DIR)/configure ]; then \
-	    $(MAKE) libjpeg-turbo_configure; \
-	  fi; \
-	  if [ -x $(libjpeg-turbo_DIR)/configure ]; then \
-	    $(MAKE) libjpeg-turbo_makefile; \
-	  fi; \
+	  $(MAKE) libjpeg-turbo_makefile; \
 	fi
-	$(libjpeg-turbo_MAKE) $(patsubst libjpeg-turbo,,$(@:libjpeg-turbo_%=%))
+	$(libjpeg-turbo_MAKE) $(patsubst _%,%,$(@:libjpeg-turbo%=%))
 
 #------------------------------------
 #
 ffmpeg_DIR = $(PROJDIR)/package/ffmpeg
 ffmpeg_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ffmpeg_DIR)
-ffmpeg_CFGPARAM = --prefix=/ --disable-all \
+ffmpeg_CFGPARAM = --prefix= --disable-all \
     --extra-cflags="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     --extra-ldflags="-L$(DESTDIR)/lib"
 ifeq ("$(PLATFORM)","PI2")
 ffmpeg_CFGPARAM += --enable-cross-compile --target-os=linux \
-    --cross_prefix=$(CROSS_COMPILE) --arch=armv7-a --cpu=armv7-a
+    --cross_prefix=$(CROSS_COMPILE) --arch=vfpv3 --cpu=cortex-a7
 endif
 ffmpeg_CFGPARAM += $(addprefix --enable-protocol=,file) \
     $(addprefix --enable-decoder=,h264 h264_vdpau mjpeg) \
@@ -454,18 +357,17 @@ ffmpeg_CFGPARAM += $(addprefix --enable-protocol=,file) \
     $(addprefix --enable-,pic runtime-cpudetect hardcoded-tables) \
     $(addprefix --enable-,gpl version3 memalign-hack) \
     $(addprefix --enable-,avutil avcodec swscale avformat pthreads) \
-    $(addprefix --enable-,ffmpeg ffprobe) \
+    $(addprefix --enable-,ffmpeg ffprobe)
 
 ffmpeg_dir:
-	git clone git://source.ffmpeg.org/ffmpeg.git $(ffmpeg_DIR)
+	git clone --depth=1 git://source.ffmpeg.org/ffmpeg.git $(ffmpeg_DIR)
 
 ffmpeg_clean ffmpeg_distclean:
 	if [ -e $(ffmpeg_DIR)/config.mak ]; then \
-	  $(ffmpeg_MAKE) $(patsubst ffmpeg,,$(@:ffmpeg_%=%)); \
+	  $(ffmpeg_MAKE) $(patsubst _%,%,$(@:ffmpeg%=%)); \
 	fi
 
 ffmpeg_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(ffmpeg_DIR) && ./configure $(ffmpeg_CFGPARAM)
 
 ffmpeg ffmpeg_%:
@@ -475,13 +377,13 @@ ffmpeg ffmpeg_%:
 	if [ ! -e $(ffmpeg_DIR)/config.mak ]; then \
 	  $(MAKE) ffmpeg_makefile; \
 	fi
-	$(ffmpeg_MAKE) $(patsubst ffmpeg,,$(@:ffmpeg_%=%))
+	$(ffmpeg_MAKE) $(patsubst _%,%,$(@:ffmpeg%=%))
 
 #------------------------------------
 #
 mpg123_DIR = $(PROJDIR)/package/mpg123
 mpg123_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mpg123_DIR)
-mpg123_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+mpg123_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     --with-cpu=arm_fpu --disable-id3v2 --disable-icy \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
@@ -490,38 +392,25 @@ mpg123_dir:
 	wget -O $(dir $(mpg123_DIR))/mpg123-1.22.1.tar.bz2 \
 	    http://downloads.sourceforge.net/project/mpg123/mpg123/1.22.1/mpg123-1.22.1.tar.bz2
 	cd $(dir $(mpg123_DIR)) && \
-	    tar -jxvf mpg123-1.22.1.tar.bz2 && \
-	    ln -sf mpg123-1.22.1 mpg123
+	  tar -jxvf mpg123-1.22.1.tar.bz2 && \
+	  ln -sf mpg123-1.22.1 $(notdir $(mpg123_DIR))
 
 mpg123_clean mpg123_distclean:
 	if [ -e $(mpg123_DIR)/Makefile ]; then \
-	  $(mpg123_MAKE) $(patsubst mpg123,,$(@:mpg123_%=%)); \
-	fi
-
-mpg123_configure:
-	if [ -x $(mpg123_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(mpg123_DIR) && ./autogen.sh; \
-	elif [ -e $(mpg123_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(mpg123_DIR) && autoreconf -fiv; \
+	  $(mpg123_MAKE) $(patsubst _%,%,$(@:mpg123%=%)); \
 	fi
 
 mpg123_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(mpg123_DIR) && ./configure $(mpg123_CFGPARAM)
 
 mpg123 mpg123_%:
 	if [ ! -d $(mpg123_DIR) ]; then \
 	  $(MAKE) mpg123_dir; \
 	fi
-	if [ ! -x $(mpg123_DIR)/configure ]; then \
-	  $(MAKE) mpg123_configure; \
-	fi; \
 	if [ ! -e $(mpg123_DIR)/Makefile ]; then \
 	  $(MAKE) mpg123_makefile; \
 	fi
-	$(mpg123_MAKE) $(patsubst mpg123,,$(@:mpg123_%=%))
+	$(mpg123_MAKE) $(patsubst _%,%,$(@:mpg123%=%))
 
 #------------------------------------
 #
@@ -538,8 +427,8 @@ openssl_dir:
 	wget -O $(dir $(openssl_DIR))/openssl-1.0.2-latest.tar.gz \
 	    https://www.openssl.org/source/openssl-1.0.2-latest.tar.gz
 	cd $(dir $(openssl_DIR)) && \
-	    tar -zxvf openssl-1.0.2-latest.tar.gz && \
-	    ln -sf openssl-1.0.2c openssl
+	  tar -zxvf openssl-1.0.2-latest.tar.gz && \
+	  ln -sf openssl-1.0.2c $(notdir $(openssl_DIR))
 
 openssl_clean openssl_distclean:
 	if [ -e $(openssl_DIR)/Makefile ]; then \
@@ -561,7 +450,6 @@ openssl openssl_%:
 #------------------------------------
 #
 wpa-supplicant_DIR = $(PROJDIR)/package/wpa_supplicant
-#  -DOPENSSL_USE_DEPRECATED
 wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) LIBDIR=/lib/ BINDIR=/usr/sbin/ \
     EXTRA_CFLAGS+="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS+="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
@@ -572,8 +460,8 @@ wpa-supplicant_dir:
 	wget -O $(dir $(wpa-supplicant_DIR))/wpa_supplicant-2.4.tar.gz \
 	    http://w1.fi/releases/wpa_supplicant-2.4.tar.gz
 	cd $(dir $(wpa-supplicant_DIR)) && \
-	    tar -zxvf wpa_supplicant-2.4.tar.gz && \
-	    ln -sf wpa_supplicant-2.4 $(notdir $(wpa-supplicant_DIR))
+	  tar -zxvf wpa_supplicant-2.4.tar.gz && \
+	  ln -sf wpa_supplicant-2.4 $(notdir $(wpa-supplicant_DIR))
 
 wpa-supplicant_clean:
 	$(wpa-supplicant_MAKE) clean
@@ -600,21 +488,20 @@ wpa-supplicant wpa-supplicant_%:
 #
 curl_DIR = $(PROJDIR)/package/curl
 curl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(curl_DIR)
-curl_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` --with-ssl \
-    CFLAGS="$(PLATFORM_CFLAGS)" \
-    CPPFLAGS="-I$(DESTDIR)/include" \
+curl_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) --with-ssl \
+    CFLAGS="$(PLATFORM_CFLAGS)" CPPFLAGS="-I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 curl_dir:
 	cd $(dir $(curl_DIR)) && \
 	    wget http://curl.haxx.se/download/curl-7.43.0.tar.bz2
 	cd $(dir $(curl_DIR)) && \
-	    tar -jxvf curl-7.43.0.tar.bz2 && \
-	    ln -sf curl-7.43.0 curl
+	  tar -jxvf curl-7.43.0.tar.bz2 && \
+	  ln -sf curl-7.43.0 $(notdir $(curl_DIR))
 
 curl_clean curl_distclean:
 	if [ -e $(curl_DIR)/Makefile ]; then \
-	  $(curl_MAKE) $(patsubst curl,,$(@:curl_%=%)); \
+	  $(curl_MAKE) $(patsubst _%,%,$(@:curl%=%)); \
 	fi
 
 curl_makefile:
@@ -627,32 +514,26 @@ curl curl_%:
 	if [ ! -e $(curl_DIR)/Makefile ]; then \
 	  $(MAKE) curl_makefile; \
 	fi
-	$(curl_MAKE) $(patsubst curl,,$(@:curl_%=%))
+	$(curl_MAKE) $(patsubst _%,%,$(@:curl%=%))
 
 #------------------------------------
 #
 sox_DIR = $(PROJDIR)/package/sox
 sox_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(sox_DIR)
-sox_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+sox_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 sox_dir:
-	git clone git://git.code.sf.net/p/sox/code $(sox_DIR)
+	git clone --depth=1 git://git.code.sf.net/p/sox/code $(sox_DIR)
 
 sox_clean sox_distclean:
 	if [ -e $(sox_DIR)/Makefile ]; then \
-	  $(sox_MAKE) $(patsubst sox,,$(@:sox_%=%)); \
+	  $(sox_MAKE) $(patsubst _%,%,$(@:sox%=%)); \
 	fi
 
 sox_configure:
-	if [ -x $(sox_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(sox_DIR) && ./autogen.sh; \
-	elif [ -e $(sox_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(sox_DIR) && autoreconf -fiv; \
-	fi
+	cd $(sox_DIR) && autoreconf -fiv
 
 sox_makefile:
 	echo "Makefile *** Generate Makefile by configure..."
@@ -664,23 +545,27 @@ sox sox_%:
 	fi
 	if [ ! -x $(sox_DIR)/configure ]; then \
 	  $(MAKE) sox_configure; \
-	fi; \
+	fi
 	if [ ! -e $(sox_DIR)/Makefile ]; then \
 	  $(MAKE) sox_makefile; \
 	fi
-	$(sox_MAKE) $(patsubst sox,,$(@:sox_%=%))
+	$(sox_MAKE) $(patsubst _%,%,$(@:sox%=%))
+
+#------------------------------------
+#
+include bluez.mk
 
 #------------------------------------
 #
 libmoss_DIR = $(PROJDIR)/package/libmoss
 libmoss_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libmoss_DIR)
-libmoss_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+libmoss_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 libmoss_clean libmoss_distclean:
 	if [ -e $(libmoss_DIR)/Makefile ]; then \
-	  $(libmoss_MAKE) $(patsubst libmoss,,$(@:libmoss_%=%)); \
+	  $(libmoss_MAKE) $(patsubst _%,,$(@:libmoss%=%)); \
 	fi
 
 libmoss_dir:
@@ -692,44 +577,35 @@ libmoss_dir:
 	fi
 
 libmoss_configure:
-	if [ -x $(libmoss_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(libmoss_DIR) && ./autogen.sh; \
-	elif [ -e $(libmoss_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(libmoss_DIR) && autoreconf -fiv; \
-	fi
+	cd $(libmoss_DIR) && ./autogen.sh
 
 libmoss_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(libmoss_DIR) && ./configure $(libmoss_CFGPARAM)
 
 libmoss libmoss_%:
 	if [ ! -d $(libmoss_DIR) ]; then \
 	  $(MAKE) libmoss_dir; \
 	fi
-	if [ ! -e $(libmoss_DIR)/Makefile ]; then \
-	  if [ ! -x $(libmoss_DIR)/configure ]; then \
-	    $(MAKE) libmoss_configure; \
-	  fi; \
-	  if [ -x $(libmoss_DIR)/configure ]; then \
-	    $(MAKE) libmoss_makefile; \
-	  fi; \
+	if [ ! -x $(libmoss_DIR)/configure ]; then \
+	  $(MAKE) libmoss_configure; \
 	fi
-	$(libmoss_MAKE) $(patsubst libmoss,,$(@:libmoss_%=%))
+	if [ -x $(libmoss_DIR)/configure ]; then \
+	  $(MAKE) libmoss_makefile; \
+	fi
+	$(libmoss_MAKE) $(patsubst _%,,$(@:libmoss%=%))
 
 #------------------------------------
 #
 webme_DIR = $(PROJDIR)/package/webme
 webme_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(webme_DIR)
-webme_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+webme_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     --with-pic --with-debug \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 $(addprefix webme_,clean distclean): ;
 	if [ -e $(webme_DIR)/Makefile ]; then \
-	  $(webme_MAKE) $(patsubst webme,,$(@:webme_%=%)); \
+	  $(webme_MAKE) $(patsubst _%,%,$(@:webme%=%)); \
 	fi
 
 webme_dir: ;
@@ -740,115 +616,52 @@ webme_dir: ;
 #	  ln -sf webme1-1.1 $(notdir $(webme_DIR))
 
 webme_configure:
-	if [ -x $(webme_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(webme_DIR) && ./autogen.sh; \
-	elif [ -e $(webme_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(webme_DIR) && autoreconf -fiv; \
-	fi
+	cd $(webme_DIR) && autoreconf -fiv
 
 webme_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(webme_DIR) && $(webme_CFGENV) ./configure $(webme_CFGPARAM)
 
 webme webme_%:
 	if [ ! -d $(webme_DIR) ]; then \
 	  $(MAKE) webme_dir; \
 	fi
-	if [ ! -f $(webme_DIR)/Makefile ]; then \
-	  if [ ! -x $(webme_DIR)/configure ]; then \
-	    $(MAKE) webme_configure; \
-	  fi; \
-	  if [ -x $(webme_DIR)/configure ]; then \
-	    $(MAKE) webme_makefile; \
-	  fi; \
+	if [ ! -x $(webme_DIR)/configure ]; then \
+	  $(MAKE) webme_configure; \
 	fi
-	$(webme_MAKE) $(patsubst webme,,$(@:webme_%=%))
-
-#------------------------------------
-#
-dbus_DIR = $(PROJDIR)/package/dbus
-dbus_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(dbus_DIR)
-dbus_CFGPARAM = --prefix=/ --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
-    --with-pic --enable-abstract-sockets \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
-
-$(addprefix dbus_,clean distclean): ;
-	if [ -e $(dbus_DIR)/Makefile ]; then \
-	  $(dbus_MAKE) $(patsubst dbus,,$(@:dbus_%=%)); \
+	if [ -x $(webme_DIR)/configure ]; then \
+	  $(MAKE) webme_makefile; \
 	fi
-
-dbus_dir: ;
-	wget -O $(dir $(dbus_DIR))/dbus-1.8.20.tar.gz \
-	    http://dbus.freedesktop.org/releases/dbus/dbus-1.8.20.tar.gz
-	cd  $(dir $(dbus_DIR)) && \
-	  tar -zxvf dbus-1.8.20.tar.gz && \
-	  ln -sf dbus-1.8.20 $(notdir $(dbus_DIR))
-
-dbus_configure:
-	if [ -x $(dbus_DIR)/autogen.sh ]; then \
-	  echo "Makefile *** Generate configure by autogen.sh..."; \
-	  cd $(dbus_DIR) && ./autogen.sh; \
-	elif [ -e $(dbus_DIR)/configure.ac ]; then \
-	  echo "Makefile *** Generate configure by autoreconf..."; \
-	  cd $(dbus_DIR) && autoreconf -fiv; \
-	fi
-
-dbus_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
-	cd $(dbus_DIR) && $(dbus_CFGENV) ./configure $(dbus_CFGPARAM)
-
-dbus dbus_%:
-	if [ ! -d $(dbus_DIR) ]; then \
-	  $(MAKE) dbus_dir; \
-	fi
-	if [ ! -f $(dbus_DIR)/Makefile ]; then \
-	  if [ ! -x $(dbus_DIR)/configure ]; then \
-	    $(MAKE) dbus_configure; \
-	  fi; \
-	  if [ -x $(dbus_DIR)/configure ]; then \
-	    $(MAKE) dbus_makefile; \
-	  fi; \
-	fi
-	$(dbus_MAKE) $(patsubst dbus,,$(@:dbus_%=%))
+	$(webme_MAKE) $(patsubst _%,%,$(@:webme%=%))
 
 #------------------------------------
 #
 v4l2info_DIR = $(PROJDIR)/package/v4l2info
-v4l2info_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
-    CROSS_COMPILE=$(CROSS_COMPILE) \
-    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
-    -C $(v4l2info_DIR)
 
 v4l2info v4l2info_%:
-	$(v4l2info_MAKE) $(patsubst v4l2info,,$(@:v4l2info_%=%))
+	$(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) CROSS_COMPILE=$(CROSS_COMPILE) \
+	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+	    -C $(v4l2info_DIR) $(patsubst _%,%,$(@:v4l2info%=%))
 
 #------------------------------------
 #
 fbinfo_DIR = $(PROJDIR)/package/fbinfo
-fbinfo_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
-    CROSS_COMPILE=$(CROSS_COMPILE) \
-    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
-    -C $(fbinfo_DIR)
 
 fbinfo fbinfo_%:
-	$(fbinfo_MAKE) $(patsubst fbinfo,,$(@:fbinfo_%=%))
+	$(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) CROSS_COMPILE=$(CROSS_COMPILE) \
+	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+	    -C $(fbinfo_DIR) $(patsubst _%,%,$(@:fbinfo%=%))
 
 #------------------------------------
 #
 gpioctl-pi_DIR = $(PROJDIR)/package/gpioctl-pi
-gpioctl-pi_MAKE = $(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) \
-    CROSS_COMPILE=$(CROSS_COMPILE) \
-    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
-    -C $(gpioctl-pi_DIR)
 
 gpioctl-pi gpioctl-pi_%:
-	$(gpioctl-pi_MAKE) $(patsubst gpioctl-pi,,$(@:gpioctl-pi_%=%))
+	$(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) CROSS_COMPILE=$(CROSS_COMPILE) \
+	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+	    -C $(gpioctl-pi_DIR) $(patsubst _%,%,$(@:gpioctl-pi%=%))
 
 #------------------------------------
 #
@@ -909,7 +722,10 @@ so1:
 so2:
 	$(MAKE) SRCFILE="libgcc_s.so.1 libdl.so.* libdl-*.so librt.so.* librt-*.so" \
 	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
-	    DESTDIR=$(DESTDIR)/lib dist_cp 
+	    DESTDIR=$(DESTDIR)/lib dist_cp
+	$(MAKE) SRCFILE="libnss_*.so libnss_*.so.*" \
+	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
+	    DESTDIR=$(DESTDIR)/lib dist_cp
 
 prebuilt:
 	$(MKDIR) $(DESTDIR)
@@ -931,6 +747,13 @@ initramfs: tool
 
 .PHONY: initramfs
 
+dist-bt%:
+	$(MAKE) zlib$(@:dist-bt%=%) expat$(@:dist-bt%=%) \
+	    libical$(@:dist-bt%=%) ncurses$(@:dist-bt%=%) libffi$(@:dist-bt%=%)
+	$(MAKE) readline$(@:dist-bt%=%) glib$(@:dist-bt%=%) \
+	    dbus$(@:dist-bt%=%)
+	$(MAKE) bluez$(@:dist-bt%=%)
+
 userland: tool
 	$(MAKE) linux_headers_install
 	$(MAKE) busybox
@@ -943,6 +766,8 @@ ifeq ("$(PLATFORM)","PI2")
 	$(MAKE) DESTDIR=$(PROJDIR)/userland \
 	    PREBUILT="$(PROJDIR)/prebuilt/userland/* $(PROJDIR)/prebuilt/userland-pi/*" \
 	    prebuilt
+	$(MAKE) hx711-drv
+	$(MAKE) DESTDIR=$(PROJDIR)/userland hx711-drv_modules_install
 else
 	$(MAKE) DESTDIR=$(PROJDIR)/userland \
 	    PREBUILT="$(PROJDIR)/prebuilt/userland/*" prebuilt

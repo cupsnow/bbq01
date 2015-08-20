@@ -46,28 +46,41 @@ static struct {
 
 } impl;
 
+static void hx711_delay(int ns)
+{
+	ndelay(ns);
+}
+
+static void hx711_down(void)
+{
+	gpio_set_value(hx711_clk, 1);
+	hx711_delay(60000);
+	gpio_set_value(hx711_clk, 0);
+}
+
 static int hx711_read(void)
 {
-#define WAIT_MAX 100
+#define WAIT_MAX 50000
 	int cnt, val;
 
 	gpio_set_value(hx711_clk, 0);
-	udelay(1);
-
-	for (cnt = 0; cnt < WAIT_MAX; cnt++) {
+	for (cnt = 0; cnt < WAIT_MAX; cnt += 1000) {
 		if (!gpio_get_value(hx711_dio)) break;
-		udelay(1);
+		hx711_delay(1000);
 	}
 	if (cnt >= WAIT_MAX) return -1;
 
 	val = 0;
-	for (cnt = 0; cnt < 25; cnt++) {
+	for (cnt = 0; cnt < 24; cnt++) {
 		gpio_set_value(hx711_clk, 1);
-		udelay(1);
+		hx711_delay(100);
 		gpio_set_value(hx711_clk, 0);
-		val = (val << 1) | (!!gpio_get_value(hx711_dio));
-		udelay(1);
+		val <<= 1; if (gpio_get_value(hx711_dio)) val++;
+		udelay(100);
 	}
+	gpio_set_value(hx711_clk, 1);
+	hx711_delay(100);
+	gpio_set_value(hx711_clk, 0);
 	return val;
 }
 
@@ -151,6 +164,8 @@ static int __init drv_init(void)
 		return PTR_ERR(impl.dev);
 	}
 
+	hx711_down();
+
 	return 0;
 }
 module_init(drv_init);
@@ -161,6 +176,8 @@ static void __exit drv_exit(void)
 	class_unregister(impl.cls);
 	class_destroy(impl.cls);
 	unregister_chrdev(hx711_major, DEV_NAME);
+
+	hx711_down();
 }
 module_exit(drv_exit);
 
