@@ -104,13 +104,13 @@ else
 endif
 
 linux_clean linux_distclean linux_mrproper linux_clobber linux_oldconfig:
-	$(linux_MAKE) $(patsubst _%,,$(@:linux%=%))
+	$(linux_MAKE) $(patsubst _%,%,$(@:linux%=%))
 
 linux linux_%: tool
 	if [ ! -f $(linux_DIR)/.config ]; then \
 	  $(MAKE) linux_config; \
 	fi
-	$(linux_MAKE) $(patsubst _%,,$(@:linux%=%))
+	$(linux_MAKE) $(patsubst _%,%,$(@:linux%=%))
 
 #------------------------------------
 #
@@ -157,7 +157,7 @@ zlib_dir:
 
 zlib_clean zlib_distclean:
 	if [ -e $(zlib_DIR)/Makefile ]; then \
-	  $(zlib_MAKE) $(patsubst _%,,$(@:zlib%=%)); \
+	  $(zlib_MAKE) $(patsubst _%,%,$(@:zlib%=%)); \
 	fi
 
 zlib_makefile:
@@ -172,7 +172,7 @@ zlib zlib_%:
 	if [ ! -e $(zlib_DIR)/configure.log ]; then \
 	  $(MAKE) zlib_makefile; \
 	fi
-	$(zlib_MAKE) $(patsubst _%,,$(@:zlib%=%))
+	$(zlib_MAKE) $(patsubst _%,%,$(@:zlib%=%))
 
 #------------------------------------
 # ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes
@@ -565,7 +565,7 @@ libmoss_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
 
 libmoss_clean libmoss_distclean:
 	if [ -e $(libmoss_DIR)/Makefile ]; then \
-	  $(libmoss_MAKE) $(patsubst _%,,$(@:libmoss%=%)); \
+	  $(libmoss_MAKE) $(patsubst _%,%,$(@:libmoss%=%)); \
 	fi
 
 libmoss_dir:
@@ -592,7 +592,7 @@ libmoss libmoss_%:
 	if [ -x $(libmoss_DIR)/configure ]; then \
 	  $(MAKE) libmoss_makefile; \
 	fi
-	$(libmoss_MAKE) $(patsubst _%,,$(@:libmoss%=%))
+	$(libmoss_MAKE) $(patsubst _%,%,$(@:libmoss%=%))
 
 #------------------------------------
 #
@@ -713,17 +713,13 @@ devlist:
 
 so1:
 	$(MAKE) SRCFILE="ld-*.so.* ld-*.so libpthread.so.* libpthread-*.so" \
-	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
-	    DESTDIR=$(DESTDIR)/lib dist_cp 
-	$(MAKE) SRCFILE="libc.so.* libc-*.so libm.so.* libm-*.so" \
+	    SRCFILE+="libc.so.* libc-*.so libm.so.* libm-*.so" \
 	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
 	    DESTDIR=$(DESTDIR)/lib dist_cp 
 
 so2:
 	$(MAKE) SRCFILE="libgcc_s.so.1 libdl.so.* libdl-*.so librt.so.* librt-*.so" \
-	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
-	    DESTDIR=$(DESTDIR)/lib dist_cp
-	$(MAKE) SRCFILE="libnss_*.so libnss_*.so.*" \
+	    SRCFILE+="libnss_*.so libnss_*.so.*" \
 	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
 	    DESTDIR=$(DESTDIR)/lib dist_cp
 
@@ -747,12 +743,44 @@ initramfs: tool
 
 .PHONY: initramfs
 
-dist-bt%:
-	$(MAKE) zlib$(@:dist-bt%=%) expat$(@:dist-bt%=%) \
-	    libical$(@:dist-bt%=%) ncurses$(@:dist-bt%=%) libffi$(@:dist-bt%=%)
-	$(MAKE) readline$(@:dist-bt%=%) glib$(@:dist-bt%=%) \
-	    dbus$(@:dist-bt%=%)
-	$(MAKE) bluez$(@:dist-bt%=%)
+userland-bt: tool
+	for i in proc sys dev tmp var/run var/lib; do \
+	  [ -d $(PROJDIR)/userland/$$i ] || $(MKDIR) $(PROJDIR)/userland/$$i; \
+	done
+	$(MAKE) zlib_install expat_install libical_install ncurses_install \
+	    libffi_install
+	$(MAKE) SRCFILE="libz.so libz.so.* libexpat.so libexpat.so.*" \
+	    SRCFILE+="libical.so libical.so.* libical_cxx.so libical_cxx.so.*" \
+	    SRCFILE+="libicalss.so libicalss.so.* libicalss_cxx.so libicalss_cxx.so.*" \
+	    SRCFILE+="libicalvcal.so libicalvcal.so.*" \
+	    SRCFILE+="libform.so libform.so.* libmenu.so libmenu.so.* libpanel.so libpanel.so.*" \
+	    SRCFILE+="libncurses.so libncurses.so.* libncurses++.so libncurses++.so.*" \
+	    SRCFILE+="libffi.so libffi.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) TERMLIST="ansi, linux, vt100, vt102, vt220, xterm" \
+	    DESTDIR=$(PROJDIR)/userland ncurses_install-terminfo
+	$(MAKE) readline_install glib_install dbus_install
+	$(MAKE) SRCFILE="libreadline.so libreadline.so.* libhistory.so libhistory.so.*" \
+	    SRCFILE+="libgio-*.so libgio-*.so.* libglib-*.so libglib-*.so.*" \
+	    SRCFILE+="libgmodule-*.so libgmodule-*.so.* libgobject-*.so libgobject-*.so.*" \
+	    SRCFILE+="libgthread-*.so libgthread-*.so.*" \
+	    SRCFILE+="libdbus-*.so libdbus-*.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="dbus-daemon dbus-send" \
+	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+	    dist_cp
+	$(MAKE) bluez_install
+	$(MAKE) SRCFILE="libbluetooth.so libbluetooth.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist_cp
+	$(MAKE) SRCFILE="bluetoothd" \
+	    SRCDIR=$(DESTDIR)/libexec/bluetooth DESTDIR=$(PROJDIR)/userland/bin \
+	    dist_cp
+	$(MAKE) SRCFILE="hciconfig hcitool bluetoothctl" \
+	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+	    dist_cp
 
 userland: tool
 	$(MAKE) linux_headers_install
@@ -826,6 +854,7 @@ endif
 	$(MAKE) SRCFILE="wpa_*" \
 	    SRCDIR=$(DESTDIR)/usr/sbin DESTDIR=$(PROJDIR)/userland/usr/sbin \
 	    dist_cp
+	$(MAKE) userland-bt
 
 .PHONY: userland
 

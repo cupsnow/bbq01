@@ -17,7 +17,7 @@ libical_dir:
 
 libical_clean:
 	if [ -e $(libical_DIR)/build/Makefile ]; then \
-	  $(libical_MAKE) $(patsubst libical,,$(@:libical_%=%)) \ 
+	  $(libical_MAKE) $(patsubst _%,%,$(@:libical%=%)) \ 
 	fi
 
 libical_distclean:
@@ -31,7 +31,7 @@ libical libical_%:
 	if [ ! -e $(libical_DIR)/build/Makefile ]; then \
 	  $(MAKE) libical_makefile; \
 	fi
-	$(libical_MAKE) $(patsubst libical,,$(@:libical_%=%)) 
+	$(libical_MAKE) $(patsubst _%,%,$(@:libical%=%))
 
 #------------------------------------
 #
@@ -44,7 +44,7 @@ expat_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
 
 $(addprefix expat_,clean distclean): ;
 	if [ -e $(expat_DIR)/Makefile ]; then \
-	  $(expat_MAKE) $(patsubst expat,,$(@:expat_%=%)); \
+	  $(expat_MAKE) $(patsubst _%,%,$(@:expat%=%)); \
 	fi
 
 expat_dir: ;
@@ -65,16 +65,17 @@ expat expat_%:
 	if [ ! -f $(expat_DIR)/Makefile ]; then \
 	  $(MAKE) expat_makefile; \
 	fi
-	$(expat_MAKE) $(patsubst expat,,$(@:expat_%=%))
+	$(expat_MAKE) $(patsubst _%,%,$(@:expat%=%))
 
 #------------------------------------
 #
 ncurses_DIR = $(PROJDIR)/package/ncurses
 ncurses_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ncurses_DIR)
 ncurses_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    --without-tests \
+    --without-tests --without-manpages --disable-db-install \
+    --with-shared --with-cxx-shared \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -pie"
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 ncurses_dir:
 	wget -O $(dir $(ncurses_DIR))/ncurses-6.0.tar.gz \
@@ -85,12 +86,16 @@ ncurses_dir:
 
 ncurses_clean ncurses_distclean:
 	if [ -e $(ncurses_DIR)/Makefile ]; then \
-	  $(ncurses_MAKE) $(patsubst ncurses,,$(@:ncurses_%=%)); \
+	  $(ncurses_MAKE) $(patsubst _%,%,$(@:ncurses%=%)); \
 	fi
 
 ncurses_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
 	cd $(ncurses_DIR) && ./configure $(ncurses_CFGPARAM)
+
+ncurses_install-terminfo:
+	tic -s -1 -I -e"$(TERMLIST)" $(ncurses_DIR)/misc/terminfo.src > terminfo.tmp
+	$(MKDIR) $(DESTDIR)/etc/terminfo
+	tic -s -o $(DESTDIR)/etc/terminfo terminfo.tmp
 
 ncurses ncurses_%:
 	if [ ! -d $(ncurses_DIR) ]; then \
@@ -99,7 +104,7 @@ ncurses ncurses_%:
 	if [ ! -e $(ncurses_DIR)/Makefile ]; then \
 	  $(MAKE) ncurses_makefile; \
 	fi
-	$(ncurses_MAKE) $(patsubst ncurses,,$(@:ncurses_%=%))
+	$(ncurses_MAKE) $(patsubst _%,%,$(@:ncurses%=%))
 
 #------------------------------------
 #
@@ -119,7 +124,7 @@ libffi_dir: ;
 
 $(addprefix libffi_,clean distclean): ;
 	if [ -e $(libffi_DIR)/Makefile ]; then \
-	  $(libffi_MAKE) $(patsubst libffi,,$(@:libffi_%=%)); \
+	  $(libffi_MAKE) $(patsubst _%,%,$(@:libffi%=%)); \
 	fi
 
 libffi_makefile:
@@ -133,8 +138,8 @@ libffi libffi_%:
 	if [ ! -f $(libffi_DIR)/Makefile ]; then \
 	  $(MAKE) libffi_makefile; \
 	fi
-	$(libffi_MAKE) $(patsubst libffi,,$(@:libffi_%=%))
-	if [ "$(patsubst libffi,,$(@:libffi_%=%))" = "install" ]; then \
+	$(libffi_MAKE) $(patsubst _%,%,$(@:libffi%=%))
+	if [ "$(patsubst _%,%,$(@:libffi%=%))" = "install" ]; then \
 	  if [ -d $(DESTDIR)/lib/libffi-*/include ]; then \
 	    $(MKDIR) $(DESTDIR)/include; \
 	    mv $(DESTDIR)/lib/libffi-*/include/* $(DESTDIR)/include/; \
@@ -162,7 +167,7 @@ dbus_dir: ;
 
 $(addprefix dbus_,clean distclean): ;
 	if [ -e $(dbus_DIR)/Makefile ]; then \
-	  $(dbus_MAKE) $(patsubst dbus,,$(@:dbus_%=%)); \
+	  $(dbus_MAKE) $(patsubst _%,%,$(@:dbus%=%)); \
 	fi
 
 dbus_makefile:
@@ -176,7 +181,7 @@ dbus dbus_%:
 	if [ ! -f $(dbus_DIR)/Makefile ]; then \
 	  $(MAKE) dbus_makefile; \
 	fi
-	$(dbus_MAKE) $(patsubst dbus,,$(@:dbus_%=%))
+	$(dbus_MAKE) $(patsubst _%,%,$(@:dbus%=%))
 
 #------------------------------------
 # dependency: ncurses
@@ -197,7 +202,7 @@ readline_dir:
 
 readline_clean readline_distclean:
 	if [ -e $(readline_DIR)/Makefile ]; then \
-	  $(readline_MAKE) $(patsubst readline,,$(@:readline_%=%)); \
+	  $(readline_MAKE) $(patsubst _%,%,$(@:readline%=%)); \
 	fi
 
 readline_makefile:
@@ -211,7 +216,13 @@ readline readline_%:
 	if [ ! -e $(readline_DIR)/Makefile ]; then \
 	  $(MAKE) readline_makefile; \
 	fi
-	$(readline_MAKE) $(patsubst readline,,$(@:readline_%=%))
+	$(readline_MAKE) $(patsubst _%,%,$(@:readline%=%))
+	if [ "$(patsubst _%,%,$(@:readline%=%))" = "install" ]; then \
+	  for i in libhistory.old libhistory.so.6.3.old \
+	      libreadline.old libreadline.so.6.3.old; do \
+	    $(RM) $(DESTDIR)/lib/$$i; \
+	  done; \
+	fi
 
 #------------------------------------
 # dependent: libffi zlib
@@ -236,7 +247,7 @@ glib_dir: ;
 
 $(addprefix glib_,clean distclean): ;
 	if [ -e $(glib_DIR)/Makefile ]; then \
-	  $(glib_MAKE) $(patsubst glib,,$(@:glib_%=%)); \
+	  $(glib_MAKE) $(patsubst _%,%,$(@:glib%=%)); \
 	fi
 
 glib_makefile:
@@ -250,7 +261,7 @@ glib glib_%:
 	if [ ! -f $(glib_DIR)/Makefile ]; then \
 	  $(MAKE) glib_makefile; \
 	fi
-	$(glib_MAKE) $(patsubst glib,,$(@:glib_%=%))
+	$(glib_MAKE) $(patsubst _%,%,$(@:glib%=%))
 
 #------------------------------------
 # dependent: readline, libical, dbus, glib
@@ -261,9 +272,9 @@ bluez_MAKE = $(MAKE) DESTDIR=$(DESTDIR) V=1 -C $(bluez_DIR)
 bluez_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     --with-pic $(addprefix --enable-,static library threads pie) \
     $(addprefix --disable-,udev cups systemd) \
-    --with-dbusconfdir=$(DESTDIR)/etc \
-    --with-dbussystembusdir=$(DESTDIR)/share/dbus-1/system-services \
-    --with-dbussessionbusdir=$(DESTDIR)/share/dbus-1/services \
+    --with-dbusconfdir=/etc \
+    --with-dbussystembusdir=/share/dbus-1/system-services \
+    --with-dbussessionbusdir=/share/dbus-1/services \
     DBUS_CFLAGS="-I$(DESTDIR)/include/dbus-1.0 -I$(DESTDIR)/lib/dbus-1.0/include" \
     DBUS_LIBS="-L$(DESTDIR)/lib -ldbus-1" \
     ICAL_CFLAGS="-I$(DESTDIR)/include" \
@@ -280,7 +291,7 @@ bluez_dir:
 
 $(addprefix bluez_,clean distclean): ;
 	if [ -e $(bluez_DIR)/Makefile ]; then \
-	  $(bluez_MAKE) $(patsubst bluez,,$(@:bluez_%=%)); \
+	  $(bluez_MAKE) $(patsubst _%,%,$(@:bluez%=%)); \
 	fi
 
 bluez_makefile:
@@ -293,7 +304,11 @@ bluez bluez_%:
 	if [ ! -e $(bluez_DIR)/Makefile ]; then \
 	  $(MAKE) bluez_makefile; \
 	fi
-	$(bluez_MAKE) $(patsubst bluez,,$(@:bluez_%=%)) 
+	$(bluez_MAKE) $(patsubst _%,%,$(@:bluez%=%))
+	if [ "$(patsubst _%,%,$(@:bluez%=%))" = "install" ]; then \
+	  [ -d $(DESTDIR)/etc/bluetooth ] || $(MKDIR) $(DESTDIR)/etc/bluetooth; \
+	  $(CP) $(bluez_DIR)/src/main.conf $(DESTDIR)/etc/bluetooth/; \
+	fi
 
 #------------------------------------
 #

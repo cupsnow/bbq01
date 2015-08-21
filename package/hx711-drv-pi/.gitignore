@@ -1,0 +1,11 @@
+# app
+bin
+**/*.o
+**/*.o.d
+# kmod
+**/.tmp_versions
+**/Module.symvers
+**/modules.order
+**/*.cmd
+**/*.ko
+**/*.mod.c

@@ -10,12 +10,13 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin
 # should be done in /init or initramfs
 [ -f /etc/rc.d/init.d/sysinit ] && . /etc/rc.d/init.d/sysinit
 
-for i in /var/run; do
+for i in /var/run /tmp; do
   [ ! -d $i ] && mkdir -p $i
+  mount -t tmpfs none $i
 done
 
-for i in /var/run /tmp; do
-  mount -t tmpfs none $i
+for i in /var/run/dbus; do
+  [ ! -d $i ] && mkdir -p $i
 done
 
 echo -n "Setting hostname ..." 
