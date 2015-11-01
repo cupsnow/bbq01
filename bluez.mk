@@ -12,6 +12,8 @@ libical_CFGENV = CC=$(CC) CXX=$(C++) \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 libical_CFGPARAM = -DCMAKE_INSTALL_PREFIX=/
 
+libical: libical_;
+
 libical_dir:
 	git clone https://github.com/libical/libical.git $(libical_DIR)
 
@@ -27,7 +29,7 @@ libical_makefile:
 	$(MKDIR) $(libical_DIR)/build && cd $(libical_DIR)/build && \
 	  $(libical_CFGENV) cmake $(libical_CFGPARAM) ..
 
-libical libical_%:
+libical%:
 	if [ ! -e $(libical_DIR)/build/Makefile ]; then \
 	  $(MAKE) libical_makefile; \
 	fi
@@ -41,6 +43,8 @@ expat_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     --with-pic \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+expat: expat_;
 
 $(addprefix expat_,clean distclean): ;
 	if [ -e $(expat_DIR)/Makefile ]; then \
@@ -58,7 +62,7 @@ expat_makefile:
 	echo "Makefile *** Generate Makefile by configure..."
 	cd $(expat_DIR) && $(expat_CFGENV) ./configure $(expat_CFGPARAM)
 
-expat expat_%:
+expat%:
 	if [ ! -d $(expat_DIR) ]; then \
 	  $(MAKE) expat_dir; \
 	fi
@@ -76,6 +80,8 @@ ncurses_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     --with-shared --with-cxx-shared \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+ncurses: ncurses_;
 
 ncurses_dir:
 	wget -O $(dir $(ncurses_DIR))/ncurses-6.0.tar.gz \
@@ -97,7 +103,7 @@ ncurses_install-terminfo:
 	$(MKDIR) $(DESTDIR)/etc/terminfo
 	tic -s -o $(DESTDIR)/etc/terminfo terminfo.tmp
 
-ncurses ncurses_%:
+ncurses%:
 	if [ ! -d $(ncurses_DIR) ]; then \
 	  $(MAKE) ncurses_dir; \
 	fi
@@ -115,7 +121,9 @@ libffi_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
-libffi_dir: ;
+libffi: libffi;
+
+libffi_dir:
 	wget -O $(dir $(libffi_DIR))/libffi-3.2.1.tar.gz \
 	    ftp://sourceware.org/pub/libffi/libffi-3.2.1.tar.gz
 	cd  $(dir $(libffi_DIR)) && \
@@ -131,7 +139,7 @@ libffi_makefile:
 	echo "Makefile *** Generate Makefile by configure..."
 	cd $(libffi_DIR) && $(libffi_CFGENV) ./configure $(libffi_CFGPARAM)
 
-libffi libffi_%:
+libffi%:
 	if [ ! -d $(libffi_DIR) ]; then \
 	  $(MAKE) libffi_dir; \
 	fi
@@ -158,7 +166,9 @@ dbus_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
-dbus_dir: ;
+dbus: dbus_;
+
+dbus_dir:
 	wget -O $(dir $(dbus_DIR))/dbus-1.8.20.tar.gz \
 	    http://dbus.freedesktop.org/releases/dbus/dbus-1.8.20.tar.gz
 	cd  $(dir $(dbus_DIR)) && \
@@ -174,7 +184,7 @@ dbus_makefile:
 	echo "Makefile *** Generate Makefile by configure..."
 	cd $(dbus_DIR) && $(dbus_CFGENV) ./configure $(dbus_CFGPARAM)
 
-dbus dbus_%:
+dbus%:
 	if [ ! -d $(dbus_DIR) ]; then \
 	  $(MAKE) dbus_dir; \
 	fi
@@ -193,6 +203,8 @@ readline_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+readline: readline_;
+
 readline_dir:
 	wget -O $(dir $(readline_DIR))/readline-6.3.tar.gz \
 	    ftp://ftp.cwru.edu/pub/bash/readline-6.3.tar.gz
@@ -209,7 +221,7 @@ readline_makefile:
 	echo "Makefile *** Generate Makefile by configure..."
 	cd $(readline_DIR) && ./configure $(readline_CFGPARAM)
 
-readline readline_%:
+readline%:
 	if [ ! -d $(readline_DIR) ]; then \
 	  $(MAKE) readline_dir; \
 	fi
@@ -238,7 +250,9 @@ glib_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
-glib_dir: ;
+glib: glib_;
+
+glib_dir:
 	wget -O $(dir $(glib_DIR))/glib-2.44.1.tar.xz \
 	    https://download.gnome.org/sources/glib/2.44/glib-2.44.1.tar.xz
 	cd  $(dir $(glib_DIR)) && \
@@ -254,7 +268,7 @@ glib_makefile:
 	echo "Makefile *** Generate Makefile by configure..."
 	cd $(glib_DIR) && $(glib_CFGENV) ./configure $(glib_CFGPARAM)
 
-glib glib_%:
+glib%:
 	if [ ! -d $(glib_DIR) ]; then \
 	  $(MAKE) glib_dir; \
 	fi
@@ -282,6 +296,8 @@ bluez_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS)" CPPFLAGS="-I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lncurses"
 
+bluez: bluez_;
+
 bluez_dir:
 	wget -O $(dir $(bluez_DIR))/bluez-5.33.tar.xz \
 	    http://www.kernel.org/pub/linux/bluetooth/bluez-5.33.tar.xz
@@ -297,7 +313,7 @@ $(addprefix bluez_,clean distclean): ;
 bluez_makefile:
 	cd $(bluez_DIR) && ./configure $(bluez_CFGPARAM)
 
-bluez bluez_%:
+bluez%:
 	if [ ! -d $(bluez_DIR) ]; then \
 	  $(MAKE) bluez_dir; \
 	fi

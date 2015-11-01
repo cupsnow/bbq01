@@ -1,25 +1,45 @@
 #------------------------------------
-#
-# PROJDIR = $(abspath .)
-# include $(PROJDIR)/proj.mk
+# PROJDIR = $(abspath ..)
+# PROJDIR = $(abspath $(call my-dir)/..)
 # 
-# CROSS_COMPILE_GCC = $(lastword $(wildcard $(PROJDIR)/tool/**/bin/*gcc))
+# ADB_PATH = $(shell bash -c "type -P adb")
+# ifneq ("$(ADB_PATH)","")
+# SDK_PATH = $(abspath $(dir $(ADB_PATH))..)
+# else
+# SDK_PATH = /home/joelai/07_sw/android-sdk
+# endif
+# 
+# NDK_BUILD_PATH = $(shell bash -c "type -P ndk-build")
+# ifneq ("$(NDK_BUILD_PATH)","")
+# NDK_PATH = $(abspath $(dir $(NDK_BUILD_PATH)))
+# else
+# NDK_PATH = /home/joelai/07_sw/android-ndk
+# endif
+# 
+# ANDPROJ_TARGET = android-8
+#
+# CROSS_COMPILE_GCC = $(lastword $(wildcard $(NDK_PATH)/*/*/*/linux-x86_64/bin/arm-linux-*-gcc))
 # CROSS_COMPILE_PATH = $(abspath $(dir $(CROSS_COMPILE_GCC))..)
 # CROSS_COMPILE = $(patsubst %gcc,%,$(notdir $(CROSS_COMPILE_GCC)))
+# SYSROOT = $(NDK_PATH)/platforms/$(ANDPROJ_TARGET)/arch-arm
 # 
-# EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH)/bin
+# include $(PROJDIR:%=%/)/jni/proj.mk
 # 
+# EXTRA_PATH = $(NDK_PATH) $(CROSS_COMPILE_PATH)/bin
 # export PATH := $(subst $(SPACE),:,$(EXTRA_PATH) $(PATH))
 # 
-# $(info Makefile *** PATH=$(PATH))
-
+# PLATFORM = ANDROID
+# PLATFORM_CFLAGS = -isysroot $(SYSROOT) #-mfloat-abi=softfp -mfpu=neon
+# PLATFORM_LDFLAGS = --sysroot $(SYSROOT)
+# 
+# $(info Makefile *** PATH: $(PATH))
+#
 PROJDIR ?= $(abspath .)
 PWD = $(abspath .)
 DESTDIR ?= $(PROJDIR)/obj
 
 EMPTY =# empty
 SPACE = $(EMPTY) $(EMPTY)
-DEP = $(1).d
 
 #------------------------------------
 #
@@ -28,21 +48,18 @@ C++ = $(CROSS_COMPILE)g++
 LD = $(CROSS_COMPILE)ld
 AS = $(CROSS_COMPILE)as
 AR = $(CROSS_COMPILE)ar
+RANLIB = $(CROSS_COMPILE)ranlib
 STRIP = $(CROSS_COMPILE)strip
 INSTALL = install -D
 INSTALL_STRIP = install -D -s --strip-program=$(STRIP)
 RM = rm -rf
 MKDIR = mkdir -p
 CP = cp -R
+RSYNC = rsync -rlv --progress -f "- .svn"
 
-#------------------------------------
-#
-MAKEPARAM = PROJDIR="$(PROJDIR)" DESTDIR="$(DESTDIR)" 
+DEP = $(1).d
 DEPFLAGS = -MM -MF $(call DEP,$(1)) -MT $(1)
 TOKEN = $(word $(1),$(subst _, ,$(2)))
-#CFLAGS = -I$(PWD)/include -I$(DESTDIR)/include
-#LDFLAGS = -I$(PWD)/lib -I$(DESTDIR)/lib
-#ARFLAGS = rcs
 
 #------------------------------------
 # "$(COLOR_RED)red$(COLOR)"
@@ -58,6 +75,35 @@ COLOR_MAGENTA = $(call _COLOR,35)
 COLOR_GRAY = $(call _COLOR,37)
 
 #------------------------------------
+# $(eval $(call ANDPROJ_PREBUILT_STATIC,<name>,<lib path>,<header path>))
+#
+#define ANDPROJ_PREBUILT_STATIC
+#LOCAL_PATH := $$(ANDPROJ_LOCAL_PATH)
+#include $$(CLEAR_VARS)
+#LOCAL_MODULE := $(1)
+#LOCAL_SRC_FILES := $(2)
+#LOCAL_EXPORT_C_INCLUDES := $(3)
+#include $$(PREBUILT_STATIC_LIBRARY)
+#endef
+#
+#define ANDPROJ_PREBUILT_SHARED
+#LOCAL_PATH := $$(ANDPROJ_LOCAL_PATH)
+#include $$(CLEAR_VARS)
+#LOCAL_MODULE := $(1)
+#LOCAL_SRC_FILES := $(2)
+#LOCAL_EXPORT_C_INCLUDES := $(3)
+#include $$(PREBUILT_SHARED_LIBRARY)
+#endef
+
+#------------------------------------
+#
+#$(ex2_OBJS): %.o : %.c
+#	$(CC) -c -o $@ $(CFLAGS) $<
+#	$(CC) -E $(call DEPFLAGS,$@) $(CFLAGS) $<
+#
+#-include $(addsuffix $(DEP),$(ex2_OBJS))
+
+#------------------------------------
 #
 #dist_cp:
 #	@[ -d $(DESTDIR) ] || $(MKDIR) $(DESTDIR)
@@ -68,7 +114,7 @@ COLOR_GRAY = $(call _COLOR,37)
 #	      $(INSTALL_STRIP) $$j $(DESTDIR); \
 #	    elif [ -e $$j ]; then \
 #	      echo "$(COLOR_GREEN)installing(cp) $$j$(COLOR)"; \
-#	      $(CP) -d $$j $(DESTDIR)/; \
+#	      $(RSYNC) -d $$j $(DESTDIR)/; \
 #	    else \
 #	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
 #	    fi; \
@@ -86,8 +132,6 @@ COLOR_GRAY = $(call _COLOR,37)
 #%:
 #	$(MAKE) -C $(KDIR) M=$(PWD) $@
 #
-##------------------------------------
-##
 #else
 #obj-m := hx711.o
 #
@@ -96,7 +140,8 @@ COLOR_GRAY = $(call _COLOR,37)
 #------------------------------------
 #
 $(info proj.mk *** MAKELEVEL: $(MAKELEVEL))
-$(info proj.mk *** PROJDIR: $(PROJDIR))
+# $(info proj.mk *** PROJDIR: $(PROJDIR))
+# $(info proj.mk *** SYSROOT: $(SYSROOT))
 $(info proj.mk *** PWD: $(PWD))
 $(info proj.mk *** MAKECMDGOALS: $(MAKECMDGOALS))
 # $(info proj.mk *** .VARIABLES: $(.VARIABLES))
