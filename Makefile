@@ -51,6 +51,8 @@ tool: ;
 uboot_DIR = $(PROJDIR)/package/u-boot-2014.07
 uboot_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
 
+uboot: uboot_;
+
 uboot_config:
 ifeq ("$(PLATFORM)","XM")
 	$(uboot_MAKE) omap3_beagle_config
@@ -61,7 +63,7 @@ endif
 uboot_clean uboot_distclean:
 	$(uboot_MAKE) $(patsubst _%,%,$(@:uboot%=%))
 
-uboot uboot_%:
+uboot%:
 	if [ ! -f $(uboot_DIR)/include/config.mk ]; then \
 	  $(MAKE) uboot_config; \
 	fi
@@ -86,7 +88,9 @@ else
 linux_MAKE += LOADADDR=0x80008000
 endif
 
-linux_dir: ;
+linux: linux_;
+
+linux_dir:
 ifeq ("$(PLATFORM)","PI2")
 	if [ -d $(linux_DIR) ] ; then \
 	  cd $(linux_DIR); git pull --depth=1; \
@@ -106,7 +110,10 @@ endif
 linux_clean linux_distclean linux_mrproper linux_clobber linux_oldconfig:
 	$(linux_MAKE) $(patsubst _%,%,$(@:linux%=%))
 
-linux linux_%: tool
+linux%: tool
+	if [ ! -d $(linux_DIR) ]; then \
+	  $(MAKE) linux_dir; \
+	fi 
 	if [ ! -f $(linux_DIR)/.config ]; then \
 	  $(MAKE) linux_config; \
 	fi
@@ -116,8 +123,10 @@ linux linux_%: tool
 #
 hx711-drv_DIR = $(PROJDIR)/package/hx711-drv-pi
 
-hx711-drv hx711-drv%:
-	$(MAKE) $(MAKEPARAM) $(linux_MAKEPARAM) \
+hx711-drv: hx711-drv_;
+
+hx711-drv%:
+	$(MAKE) DESTDIR=$(DESTDIR) $(linux_MAKEPARAM) \
 	    -C $(hx711-drv_DIR) $(patsubst _%,%,$(@:hx711-drv%=%))
 
 #------------------------------------
@@ -126,6 +135,8 @@ busybox_DIR = $(PROJDIR)/package/busybox-1.22.1
 busybox_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) \
     CONFIG_PREFIX=$(DESTDIR) -C $(busybox_DIR)
 
+busybox: busybox_;
+
 busybox_config:
 #	$(MAKE) linux_headers_install
 	$(busybox_MAKE) defconfig
@@ -133,7 +144,7 @@ busybox_config:
 busybox_clean busybox_distclean:
 	$(busybox_MAKE) $(patsubst _%,%,$(@:busybox%=%))
 
-busybox busybox_%:
+busybox%:
 	if [ ! -f $(busybox_DIR)/.config ]; then \
 	  $(MAKE) busybox_config; \
 	fi
@@ -143,10 +154,12 @@ busybox busybox_%:
 #
 zlib_DIR = $(PROJDIR)/package/zlib
 zlib_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(zlib_DIR)
-zlib_CFGENV = prefix= CC=$(CROSS_COMPILE)gcc \
+zlib_CFGENV = prefix= CROSS_PREFIX=$(CROSS_COMPILE) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 zlib_CFGPARAM =
+
+zlib: zlib_;
 
 zlib_dir:
 	wget -O $(dir $(zlib_DIR))/zlib-1.2.8.tar.xz \
@@ -165,7 +178,7 @@ zlib_makefile:
 	cd $(zlib_DIR) && \
 	  $(zlib_CFGENV) ./configure $(zlib_CFGPARAM)
 
-zlib zlib_%:
+zlib%:
 	if [ ! -d $(zlib_DIR) ]; then \
 	  $(MAKE) zlib_dir; \
 	fi
@@ -183,6 +196,8 @@ json-c_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+json-c: json-c_;
+
 json-c_dir:
 	git clone --depth=1 https://github.com/json-c/json-c.git $(json-c_DIR)
 
@@ -197,7 +212,7 @@ json-c_configure:
 json-c_makefile:
 	cd $(json-c_DIR) && $(json-c_CFGENV) ./configure $(json-c_CFGPARAM)
 
-json-c json-c_%:
+json-c%:
 	if [ ! -d $(json-c_DIR) ]; then \
 	  $(MAKE) json-c_dir; \
 	fi
@@ -217,6 +232,8 @@ libevent_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+libevent: libevent_;
+
 libevent_dir:
 	wget -O $(dir $(libevent_DIR))/libevent-2.0.22-stable.tar.gz \
 	    https://sourceforge.net/projects/levent/files/libevent/libevent-2.0/libevent-2.0.22-stable.tar.gz
@@ -232,7 +249,7 @@ libevent_clean libevent_distclean:
 libevent_makefile:
 	cd $(libevent_DIR) && ./configure $(libevent_CFGPARAM)
 
-libevent libevent_%:
+libevent%:
 	if [ ! -d $(libevent_DIR) ]; then \
 	  $(MAKE) libevent_dir; \
 	fi
@@ -249,6 +266,8 @@ libnl_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) --dis
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+libnl: libnl_;
+
 libnl_dir:
 	wget -O $(dir $(libnl_DIR))/libnl-3.2.25.tar.gz \
 	    "http://www.infradead.org/~tgr/libnl/files/libnl-3.2.25.tar.gz"
@@ -264,7 +283,7 @@ libnl_clean libnl_distclean:
 libnl_makefile:
 	cd $(libnl_DIR) && ./configure $(libnl_CFGPARAM)
 
-libnl libnl_%:
+libnl%:
 	if [ ! -d $(libnl_DIR) ]; then \
 	  $(MAKE) libnl_dir; \
 	fi
@@ -284,6 +303,8 @@ x264_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     --extra-cflags="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     --extra-ldflags="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+x264: x264_;
+
 x264_dir:
 	git clone --depth=1 git://git.videolan.org/x264.git $(x264_DIR)
 
@@ -295,7 +316,7 @@ x264_clean x264_distclean:
 x264_makefile:
 	cd $(x264_DIR) && $(x264_CFGENV) ./configure $(x264_CFGPARAM)
 
-x264 x264_%:
+x264%:
 	if [ ! -d $(x264_DIR) ]; then \
 	  $(MAKE) x264_dir; \
 	fi
@@ -312,6 +333,8 @@ libjpeg-turbo_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachin
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+libjpeg-turbo: libjpeg-turbo_;
+
 libjpeg-turbo_dir:
 	wget -O $(dir $(libjpeg-turbo_DIR))/libjpeg-turbo-1.4.1.tar.gz \
 	    http://downloads.sourceforge.net/project/libjpeg-turbo/1.4.1/libjpeg-turbo-1.4.1.tar.gz
@@ -327,7 +350,7 @@ $(addprefix libjpeg-turbo_,clean distclean): ;
 libjpeg-turbo_makefile:
 	cd $(libjpeg-turbo_DIR) && ./configure $(libjpeg-turbo_CFGPARAM)
 
-libjpeg-turbo libjpeg-turbo_%:
+libjpeg-turbo%:
 	if [ ! -d $(libjpeg-turbo_DIR) ]; then \
 	  $(MAKE) libjpeg-turbo_dir; \
 	fi
@@ -340,24 +363,28 @@ libjpeg-turbo libjpeg-turbo_%:
 #
 ffmpeg_DIR = $(PROJDIR)/package/ffmpeg
 ffmpeg_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ffmpeg_DIR)
-ffmpeg_CFGPARAM = --prefix= --disable-all \
+ffmpeg_CFGPARAM = --prefix= \
     --extra-cflags="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     --extra-ldflags="-L$(DESTDIR)/lib"
 ifeq ("$(PLATFORM)","PI2")
 ffmpeg_CFGPARAM += --enable-cross-compile --target-os=linux \
     --cross_prefix=$(CROSS_COMPILE) --arch=vfpv3 --cpu=cortex-a7
 endif
-ffmpeg_CFGPARAM += $(addprefix --enable-protocol=,file) \
-    $(addprefix --enable-decoder=,h264 h264_vdpau mjpeg) \
-    $(addprefix --enable-decoder=,mpeg4 mpeg4_vdpau) \
-    $(addprefix --enable-decoder=,pcm_alaw pcm_mulaw adpcm_g726) \
-    $(addprefix --enable-hwaccel=,h264_vaapi) \
-    $(addprefix --enable-muxer=,avi mp4 matroska) \
-    $(addprefix --enable-demuxer=,avi mov) \
-    $(addprefix --enable-,pic runtime-cpudetect hardcoded-tables) \
-    $(addprefix --enable-,gpl version3 memalign-hack) \
-    $(addprefix --enable-,avutil avcodec swscale avformat pthreads) \
-    $(addprefix --enable-,ffmpeg ffprobe)
+
+#ffmpeg_CFGPARAM += --disable-all \
+#    $(addprefix --enable-protocol=,file) \
+#    $(addprefix --enable-decoder=,h264 h264_vdpau mjpeg) \
+#    $(addprefix --enable-decoder=,mpeg4 mpeg4_vdpau) \
+#    $(addprefix --enable-decoder=,pcm_alaw pcm_mulaw adpcm_g726) \
+#    $(addprefix --enable-hwaccel=,h264_vaapi) \
+#    $(addprefix --enable-muxer=,avi mp4 matroska) \
+#    $(addprefix --enable-demuxer=,avi mov) \
+#    $(addprefix --enable-,pic runtime-cpudetect hardcoded-tables) \
+#    $(addprefix --enable-,gpl version3 memalign-hack) \
+#    $(addprefix --enable-,avutil avcodec swscale avformat pthreads) \
+#    $(addprefix --enable-,ffmpeg ffprobe)
+
+ffmpeg: ffmpeg_;
 
 ffmpeg_dir:
 	git clone --depth=1 git://source.ffmpeg.org/ffmpeg.git $(ffmpeg_DIR)
@@ -370,7 +397,7 @@ ffmpeg_clean ffmpeg_distclean:
 ffmpeg_makefile:
 	cd $(ffmpeg_DIR) && ./configure $(ffmpeg_CFGPARAM)
 
-ffmpeg ffmpeg_%:
+ffmpeg%:
 	if [ ! -d $(ffmpeg_DIR) ]; then \
 	  $(MAKE) ffmpeg_dir; \
 	fi
@@ -388,6 +415,8 @@ mpg123_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+mpg123: mpg123_;
+
 mpg123_dir:
 	wget -O $(dir $(mpg123_DIR))/mpg123-1.22.1.tar.bz2 \
 	    http://downloads.sourceforge.net/project/mpg123/mpg123/1.22.1/mpg123-1.22.1.tar.bz2
@@ -403,7 +432,7 @@ mpg123_clean mpg123_distclean:
 mpg123_makefile:
 	cd $(mpg123_DIR) && ./configure $(mpg123_CFGPARAM)
 
-mpg123 mpg123_%:
+mpg123%:
 	if [ ! -d $(mpg123_DIR) ]; then \
 	  $(MAKE) mpg123_dir; \
 	fi
@@ -423,12 +452,13 @@ openssl_CFGPARAM = threads shared zlib-dynamic no-rc5 no-idea enable-deprecated 
     --prefix=/ --openssldir=/usr/openssl \
     linux-armv4:$(CC):"$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC"
 
+openssl: openssl_;
+
 openssl_dir:
-	wget -O $(dir $(openssl_DIR))/openssl-1.0.2-latest.tar.gz \
-	    https://www.openssl.org/source/openssl-1.0.2-latest.tar.gz
 	cd $(dir $(openssl_DIR)) && \
-	  tar -zxvf openssl-1.0.2-latest.tar.gz && \
-	  ln -sf openssl-1.0.2c $(notdir $(openssl_DIR))
+	  wget https://www.openssl.org/source/openssl-1.0.2d.tar.gz && \
+	  tar -zxvf openssl-1.0.2d.tar.gz && \
+	  ln -sf openssl-1.0.2d $(notdir $(openssl_DIR))
 
 openssl_clean openssl_distclean:
 	if [ -e $(openssl_DIR)/Makefile ]; then \
@@ -438,14 +468,14 @@ openssl_clean openssl_distclean:
 openssl_makefile:
 	cd $(openssl_DIR) && $(openssl_CFGENV) ./Configure $(openssl_CFGPARAM)
 
-openssl openssl_%:
+openssl%:
 	if [ ! -d $(openssl_DIR) ]; then \
 	  $(MAKE) openssl_dir; \
 	fi
 	if [ ! -e $(openssl_DIR)/Makefile.bak ]; then \
 	  $(MAKE) openssl_makefile; \
 	fi
-	$(openssl_MAKE) $(patsubst openssl,,$(@:openssl_%=%))
+	$(openssl_MAKE) $(patsubst _%,%,$(@:openssl%=%))
 
 #------------------------------------
 #
@@ -455,6 +485,8 @@ wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) LIBDIR=/lib/ BINDIR=/usr/sbin/ 
     LDFLAGS+="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
     CONFIG_LIBNL32=1 LIBNL_INC="$(DESTDIR)/include/libnl3" \
     CC=$(CC) -C $(wpa-supplicant_DIR)/wpa_supplicant
+
+wpa-supplicant: wpa-supplicant_;
 
 wpa-supplicant_dir:
 	wget -O $(dir $(wpa-supplicant_DIR))/wpa_supplicant-2.4.tar.gz \
@@ -474,7 +506,7 @@ wpa-supplicant_makefile:
 	$(CP) $(wpa-supplicant_DIR)/wpa_supplicant/defconfig \
 	    $(wpa-supplicant_DIR)/wpa_supplicant/.config
 
-wpa-supplicant wpa-supplicant_%:
+wpa-supplicant%:
 	if [ ! -d $(wpa-supplicant_DIR) ]; then \
 	  $(MAKE) wpa-supplicant_dir; \
 	fi
@@ -482,7 +514,7 @@ wpa-supplicant wpa-supplicant_%:
 	  $(MAKE) wpa-supplicant_makefile; \
 	fi
 	$(wpa-supplicant_MAKE) \
-	    $(patsubst wpa-supplicant,,$(@:wpa-supplicant_%=%))
+	    $(patsubst _%,%,$(@:wpa-supplicant%=%))
 
 #------------------------------------
 #
@@ -491,6 +523,8 @@ curl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(curl_DIR)
 curl_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) --with-ssl \
     CFLAGS="$(PLATFORM_CFLAGS)" CPPFLAGS="-I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+curl: curl_;
 
 curl_dir:
 	cd $(dir $(curl_DIR)) && \
@@ -507,7 +541,7 @@ curl_clean curl_distclean:
 curl_makefile:
 	cd $(curl_DIR) && $(curl_CFGENV) ./configure $(curl_CFGPARAM)
 
-curl curl_%:
+curl%:
 	if [ ! -d $(curl_DIR) ]; then \
 	  $(MAKE) curl_dir; \
 	fi
@@ -524,6 +558,8 @@ sox_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+sox: sox_;
+
 sox_dir:
 	git clone --depth=1 git://git.code.sf.net/p/sox/code $(sox_DIR)
 
@@ -539,7 +575,7 @@ sox_makefile:
 	echo "Makefile *** Generate Makefile by configure..."
 	cd $(sox_DIR) && ./configure $(sox_CFGPARAM)
 
-sox sox_%:
+sox%:
 	if [ ! -d $(sox_DIR) ]; then \
 	  $(MAKE) sox_dir; \
 	fi
@@ -563,6 +599,8 @@ libmoss_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+libmoss: libmoss_;
+
 libmoss_clean libmoss_distclean:
 	if [ -e $(libmoss_DIR)/Makefile ]; then \
 	  $(libmoss_MAKE) $(patsubst _%,%,$(@:libmoss%=%)); \
@@ -582,7 +620,7 @@ libmoss_configure:
 libmoss_makefile:
 	cd $(libmoss_DIR) && ./configure $(libmoss_CFGPARAM)
 
-libmoss libmoss_%:
+libmoss%:
 	if [ ! -d $(libmoss_DIR) ]; then \
 	  $(MAKE) libmoss_dir; \
 	fi
@@ -603,6 +641,8 @@ webme_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
+webme: webme_;
+
 $(addprefix webme_,clean distclean): ;
 	if [ -e $(webme_DIR)/Makefile ]; then \
 	  $(webme_MAKE) $(patsubst _%,%,$(@:webme%=%)); \
@@ -621,7 +661,7 @@ webme_configure:
 webme_makefile:
 	cd $(webme_DIR) && $(webme_CFGENV) ./configure $(webme_CFGPARAM)
 
-webme webme_%:
+webme%:
 	if [ ! -d $(webme_DIR) ]; then \
 	  $(MAKE) webme_dir; \
 	fi
@@ -637,7 +677,9 @@ webme webme_%:
 #
 v4l2info_DIR = $(PROJDIR)/package/v4l2info
 
-v4l2info v4l2info_%:
+v4l2info: v4l2info_;
+
+v4l2info%:
 	$(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) CROSS_COMPILE=$(CROSS_COMPILE) \
 	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
 	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
@@ -647,7 +689,9 @@ v4l2info v4l2info_%:
 #
 fbinfo_DIR = $(PROJDIR)/package/fbinfo
 
-fbinfo fbinfo_%:
+fbinfo: fbinfo_;
+
+fbinfo%:
 	$(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) CROSS_COMPILE=$(CROSS_COMPILE) \
 	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
 	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
@@ -657,7 +701,9 @@ fbinfo fbinfo_%:
 #
 gpioctl-pi_DIR = $(PROJDIR)/package/gpioctl-pi
 
-gpioctl-pi gpioctl-pi_%:
+gpioctl-pi: gpioctl-pi_;
+
+gpioctl-pi%:
 	$(MAKE) PREFIX=/usr DESTDIR=$(DESTDIR) CROSS_COMPILE=$(CROSS_COMPILE) \
 	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
 	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
@@ -800,13 +846,15 @@ else
 	$(MAKE) DESTDIR=$(PROJDIR)/userland \
 	    PREBUILT="$(PROJDIR)/prebuilt/userland/*" prebuilt
 endif
-	$(MAKE) zlib_install libmoss_install libnl_install openssl_install
+	$(MAKE) zlib_install libmoss_install
 	$(MAKE) SRCFILE="libz.so libz.so.* libmoss.so libmoss.so.*" \
 	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
 	    dist_cp
+	$(MAKE) libnl_install
 	$(MAKE) SRCFILE="libnl-*.so libnl-*.so.*" \
 	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
 	    dist_cp
+	$(MAKE) openssl_install
 	$(MAKE) SRCFILE="openssl" \
 	    SRCDIR=$(DESTDIR)/usr DESTDIR=$(PROJDIR)/userland/usr \
 	    dist_cp
@@ -821,7 +869,7 @@ endif
 	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
 	    dist_cp
 	$(MAKE) libevent_install libjpeg-turbo_install json-c_install \
-	    x264_install mpg123_install v4l2info_install
+	    x264_install v4l2info_install
 	$(MAKE) SRCFILE="libevent.so libevent-*.so.*" \
 	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
 	    dist_cp
@@ -834,12 +882,13 @@ endif
 	$(MAKE) SRCFILE="libx264.so libx264.so.*" \
 	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
 	    dist_cp
-	$(MAKE) SRCFILE="libmpg123.so libmpg123.so.*" \
-	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-	    dist_cp
-	$(MAKE) SRCFILE="mpg123" \
-	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-	    dist_cp
+#	$(MAKE) mpg123_install
+#	$(MAKE) SRCFILE="libmpg123.so libmpg123.so.*" \
+#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+#	    dist_cp
+#	$(MAKE) SRCFILE="mpg123" \
+#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+#	    dist_cp
 	$(MAKE) SRCFILE="v4l2info" \
 	    SRCDIR=$(DESTDIR)/usr/bin DESTDIR=$(PROJDIR)/userland/usr/bin \
 	    dist_cp
@@ -854,11 +903,11 @@ endif
 	$(MAKE) SRCFILE="wpa_*" \
 	    SRCDIR=$(DESTDIR)/usr/sbin DESTDIR=$(PROJDIR)/userland/usr/sbin \
 	    dist_cp
-	$(MAKE) userland-bt
+#	$(MAKE) userland-bt
 
 .PHONY: userland
 
-dist:
+dist: linux
 	$(RM) userland obj dist
 ifeq ("$(PLATFORM)","PI2")
 	$(MAKE) linux_uImage
@@ -908,7 +957,7 @@ test_TARGET_FILTER = $(call TOKEN,1,$(1))_$(call TOKEN,2,$(1))
 test_TARGET = $(patsubst $(call test_TARGET_FILTER,$(1)),,$(1:$(call test_TARGET_FILTER,$(1))_%=%))
 
 test_%:
-	$(MAKE) $(MAKEPARAM) $(linux_MAKEPARAM) \
+	$(MAKE) DESTDIR=$(DESTDIR) PROJDIR=$(PROJDIR) $(linux_MAKEPARAM) \
 	    -C $(PROJDIR)/$(call test_DIR,$@) $(call test_TARGET,$@)
 
 #------------------------------------
