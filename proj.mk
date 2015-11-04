@@ -1,5 +1,4 @@
 #------------------------------------
-#
 # PROJDIR = $(abspath .)
 # include $(PROJDIR)/proj.mk
 # 
@@ -12,7 +11,7 @@
 # export PATH := $(subst $(SPACE),:,$(EXTRA_PATH) $(PATH))
 # 
 # $(info Makefile *** PATH=$(PATH))
-
+#
 PROJDIR ?= $(abspath .)
 PWD = $(abspath .)
 DESTDIR ?= $(PROJDIR)/obj
@@ -59,6 +58,14 @@ COLOR_GRAY = $(call _COLOR,37)
 
 #------------------------------------
 #
+#$(ex2_OBJS): %.o : %.c
+#	$(CC) -c -o $@ $(CFLAGS) $<
+#	$(CC) -E $(call DEPFLAGS,$@) $(CFLAGS) $<
+#
+#-include $(addsuffix $(DEP),$(ex2_OBJS))
+
+#------------------------------------
+#
 #dist_cp:
 #	@[ -d $(DESTDIR) ] || $(MKDIR) $(DESTDIR)
 #	@for i in $(SRCFILE); do \
@@ -96,7 +103,7 @@ COLOR_GRAY = $(call _COLOR,37)
 #------------------------------------
 #
 $(info proj.mk *** MAKELEVEL: $(MAKELEVEL))
-$(info proj.mk *** PROJDIR: $(PROJDIR))
+# $(info proj.mk *** PROJDIR: $(PROJDIR))
 $(info proj.mk *** PWD: $(PWD))
 $(info proj.mk *** MAKECMDGOALS: $(MAKECMDGOALS))
 # $(info proj.mk *** .VARIABLES: $(.VARIABLES))

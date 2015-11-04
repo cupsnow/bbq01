@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <errno.h>
+#include <signal.h>
+
 #include <moss/util.h>
 
 typedef enum cap_id_enum {
@@ -23,6 +25,27 @@ static int cap = 0
 		| CAP_NEON
 #endif
 		;
+
+static struct {
+	void *evb;
+	struct sigaction _sigint_org, *sigint_org;
+	char stop;
+
+} impl = {NULL};
+
+static void signal_handler(int signo)
+{
+	log_debug("signo: %d\n", signo);
+	if (signo == SIGINT) {
+		log_debug("SIGINT\n");
+		impl.stop = 1;
+	}
+}
+
+static void sigaction_handler(int signum, siginfo_t *info, void *ptr)
+{
+	signal_handler(signum);
+}
 
 static void test01(int argc, char *const *argv)
 {
@@ -57,11 +80,47 @@ finally:
 	if (pwd_buf) free(pwd_buf);
 }
 
+static void test02(int argc, char *const *argv)
+{
+	struct sigaction sigint;
+	int r, cnt;
+
+	if ((sigaction(SIGINT, NULL, &impl._sigint_org)) != 0) {
+		r = errno;
+		log_error("check SIGINT status: %s(%d)\n", strerror(r), r);
+	} else {
+		impl.sigint_org = &impl._sigint_org;
+		if (impl.sigint_org->sa_handler == SIG_DFL) {
+			log_debug("check SIGINT status: SIG_DFL\n");
+		} else if (impl.sigint_org->sa_handler == SIG_IGN) {
+			log_debug("check SIGINT status: SIG_IGN\n");
+		}
+	}
+
+	sigint.sa_sigaction = sigaction_handler;
+	sigemptyset (&sigint.sa_mask);
+	sigint.sa_flags = SA_SIGINFO;
+	if ((sigaction(SIGINT, &sigint, NULL)) != 0) {
+		r = errno;
+		log_error("hook SIGINT: %s(%d)\n", strerror(r), r);
+		goto finally;
+	}
+
+	for (cnt = 10; !impl.stop && cnt > 0; cnt--) {
+		sleep(1);
+		log_debug("idx: %d\n", cnt);
+	}
+finally:
+	;
+}
+
 int main(int argc, char *const *argv)
 {
+	memset(&impl, 0, sizeof(impl));
 	log_debug("capabilities:\n"
 		"  neon: %s\n",
 		((cap & CAP_NEON) ? "yes" : "no"));
-	test01(argc, argv);
+//	test01(argc, argv);
+	test02(argc, argv);
 
 }
