@@ -719,6 +719,68 @@ $(PROJDIR)/tool/bin/mkimage:
 	$(CP) $(uboot_DIR)/tools/mkimage $(dir $@)
 
 #------------------------------------
+#
+python_DIR = $(PROJDIR)/package/python
+python_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(python_DIR)
+python_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+  --build=`gcc -dumpmachine` --disable-ipv6 ac_cv_file__dev_ptmx=yes \
+  ac_cv_file__dev_ptc=no
+python-host_DESTDIR=$(PROJDIR)/tool
+
+python: python_;
+
+$(addprefix python_,clean distclean): ;
+	if [ -e $(python_DIR)/Makefile ]; then \
+	  $(python_MAKE) $(patsubst _%,%,$(@:python%=%)); \
+	fi
+
+python_dir: ;
+	cd $(dir $(python_DIR)) && \
+	  wget https://www.python.org/ftp/python/3.5.0/Python-3.5.0.tar.xz && \
+	  tar -Jxvf Python-3.5.0.tar.xz && \
+	  ln -sf Python-3.5.0 $(notdir $(python_DIR))
+
+python-host: python-host_;
+
+python_makefile:
+	$(CP) $(PROJDIR)/config/python/Makefile.pre.in $(python_DIR)/
+	cd $(python_DIR) && \
+	  $(python_CFGENV) ./configure $(python_CFGPARAM)
+
+python-host_install:
+	if [ ! -d $(python_DIR) ]; then \
+	  $(MAKE) python_dir; \
+	fi
+	if [ ! -f $(python_DIR)/Makefile ]; then \
+	  $(MAKE) python_CFGPARAM="--prefix=" python_makefile; \
+	fi
+	$(python_MAKE) DESTDIR=$(python-host_DESTDIR) \
+	    $(patsubst _%,%,$(@:python-host%=%))
+	$(CP) $(python_DIR)/Programs/_freeze_importlib \
+	    $(python_DIR)/Parser/pgen $(python-host_DESTDIR)/bin
+
+python-host%:
+	if [ ! -d $(python_DIR) ]; then \
+	  $(MAKE) python_dir; \
+	fi
+	if [ ! -f $(python_DIR)/Makefile ]; then \
+	  $(MAKE) python_CFGPARAM="--prefix=" python_makefile; \
+	fi
+	$(python_MAKE) DESTDIR=$(python-host_DESTDIR) \
+	    $(patsubst _%,%,$(@:python-host%=%))
+
+python%:
+	if [ ! -d $(python_DIR) ]; then \
+	  $(MAKE) python_dir; \
+	fi
+	if [ ! -f $(python_DIR)/Makefile ]; then \
+	  $(MAKE) python_makefile; \
+	fi
+	$(python_MAKE) PGEN=$(python-host_DESTDIR)/bin/pgen \
+	    PFRZIMP=$(python-host_DESTDIR)/bin/_freeze_importlib \
+	    $(patsubst _%,%,$(@:python%=%))
+
+#------------------------------------
 # git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi
 #
 firmware-pi_DIR = $(PROJDIR)/package/firmware-pi
