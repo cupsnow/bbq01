@@ -11,12 +11,12 @@ CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPIL
 
 EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH:%=%/bin)
 
-# codesourcery
-#PLATFORM_CFLAGS = -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=softfp \
-#  -mtune=cortex-a7
-
-# PI2 linaro
+# linaro
+ifeq ("$(PLATFORM)","PI2")
 PLATFORM_CFLAGS = -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
+else
+
+endif
 
 export PATH := $(subst $(SPACE),:,$(strip $(EXTRA_PATH)) $(PATH))
 
@@ -40,6 +40,7 @@ env.sh: ;
 	echo "export PLATFORM="'"'"$(PLATFORM)"'"' >> $@
 
 .PHONY: env.sh
+
 #------------------------------------
 #
 tool: ;
@@ -69,6 +70,8 @@ uboot%:
 	fi
 	$(uboot_MAKE) $(patsubst _%,%,$(@:uboot%=%))
 
+CLEAN += uboot
+
 #------------------------------------
 #
 ifeq ("$(PLATFORM)","PI2")
@@ -79,14 +82,15 @@ endif
 
 linux_MAKEPARAM = CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
     INSTALL_HDR_PATH=$(DESTDIR)/usr INSTALL_MOD_PATH=$(DESTDIR) \
+    CONFIG_INITRAMFS_SOURCE=$(CONFIG_INITRAMFS_SOURCE) \
     KDIR=$(linux_DIR)
-
-linux_MAKE = $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR)
 
 ifeq ("$(PLATFORM)","PI2")
 else
 linux_MAKE += LOADADDR=0x80008000
 endif
+
+linux_MAKE = $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR)
 
 linux: linux_;
 
@@ -119,6 +123,8 @@ linux%: tool
 	fi
 	$(linux_MAKE) $(patsubst _%,%,$(@:linux%=%))
 
+CLEAN += linux
+
 #------------------------------------
 #
 hx711-drv_DIR = $(PROJDIR)/package/hx711-drv-pi
@@ -128,6 +134,8 @@ hx711-drv: hx711-drv_;
 hx711-drv%:
 	$(MAKE) DESTDIR=$(DESTDIR) $(linux_MAKEPARAM) \
 	    -C $(hx711-drv_DIR) $(patsubst _%,%,$(@:hx711-drv%=%))
+
+CLEAN += hx711-drv
 
 #------------------------------------
 #
@@ -150,6 +158,8 @@ busybox%:
 	fi
 	$(busybox_MAKE) $(patsubst _%,%,$(@:busybox%=%))
 
+CLEAN += busybox
+
 #------------------------------------
 #
 zlib_DIR = $(PROJDIR)/package/zlib
@@ -168,7 +178,12 @@ zlib_dir:
 	  tar -Jxvf zlib-1.2.8.tar.xz && \
 	  ln -sf zlib-1.2.8 $(notdir $(zlib_DIR))
 
-zlib_clean zlib_distclean:
+zlib_clean:
+	if [ -e $(zlib_DIR)/configure.log ]; then \
+	  $(zlib_MAKE) $(patsubst _%,%,$(@:zlib%=%)); \
+	fi
+
+zlib_distclean:
 	if [ -e $(zlib_DIR)/Makefile ]; then \
 	  $(zlib_MAKE) $(patsubst _%,%,$(@:zlib%=%)); \
 	fi
@@ -187,12 +202,38 @@ zlib%:
 	fi
 	$(zlib_MAKE) $(patsubst _%,%,$(@:zlib%=%))
 
+CLEAN += zlib
+
 #------------------------------------
-# ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes
+#
+bzip2_DIR = $(PROJDIR)/package/bzip2
+bzip2_MAKE = $(MAKE) DESTDIR=$(DESTDIR) CC=$(CC) AR=$(AR) RANLIB=$(RANLIB) \
+    CFLAGS+="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS+="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    PREFIX=$(DESTDIR) -C $(bzip2_DIR)
+
+bzip2: bzip2_;
+
+bzip2_dir:
+	cd $(dir $(bzip2_DIR)) && \
+	  wget "http://www.bzip.org/1.0.6/bzip2-1.0.6.tar.gz" && \
+	  tar -zxvf bzip2-1.0.6.tar.gz && \
+	  ln -sf bzip2-1.0.6 $(notdir $(bzip2_DIR))
+
+bzip2%:
+	if [ ! -d $(bzip2_DIR) ]; then \
+	  $(MAKE) bzip2_dir; \
+	fi
+	$(bzip2_MAKE) $(patsubst _%,%,$(@:bzip2%=%))
+
+CLEAN += bzip2
+
+#------------------------------------
 #
 json-c_DIR = $(PROJDIR)/package/json-c
 json-c_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(json-c_DIR)
 json-c_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+    ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -200,11 +241,18 @@ json-c: json-c_;
 
 json-c_dir:
 	git clone --depth=1 https://github.com/json-c/json-c.git $(json-c_DIR)
+	cd $(dir $(json-c_DIR)) && \
+	  tar -jcvf json-c.tar.bz2 $(notdir $(json-c_DIR))
 
-json-c_clean json-c_distclean:
+json-c_clean:
 	if [ -e $(json-c_DIR)/Makefile ]; then \
 	  $(json-c_MAKE) $(patsubst _%,%,$(@:json-c%=%)); \
 	fi
+
+json-c_distclean:
+	$(RM) $(json-c_DIR)
+	cd $(dir $(json-c_DIR)) && \
+	  tar -jxvf json-c.tar.bz2
 
 json-c_configure:
 	cd $(json-c_DIR) && ./autogen.sh;
@@ -223,6 +271,8 @@ json-c%:
 	  $(MAKE) json-c_makefile; \
 	fi
 	$(json-c_MAKE) $(patsubst _%,%,$(@:json-c%=%))
+
+CLEAN += json-c
 
 #------------------------------------
 #
@@ -258,6 +308,8 @@ libevent%:
 	fi
 	$(libevent_MAKE) $(patsubst _%,%,$(@:libevent%=%))
 
+CLEAN += libevent
+
 #------------------------------------
 #
 libnl_DIR = $(PROJDIR)/package/libnl
@@ -292,6 +344,8 @@ libnl%:
 	fi
 	$(libnl_MAKE) $(patsubst _%,%,$(@:libnl%=%))
 
+CLEAN += libnl
+
 #------------------------------------
 #
 x264_DIR = $(PROJDIR)/package/x264
@@ -324,6 +378,8 @@ x264%:
 	  $(MAKE) x264_makefile; \
 	fi
 	$(x264_MAKE) $(patsubst _%,%,$(@:x264%=%))
+
+CLEAN += x264
 
 #------------------------------------
 #
@@ -359,35 +415,43 @@ libjpeg-turbo%:
 	fi
 	$(libjpeg-turbo_MAKE) $(patsubst _%,%,$(@:libjpeg-turbo%=%))
 
+CLEAN += libjpeg-turbo
+
 #------------------------------------
 #
 ffmpeg_DIR = $(PROJDIR)/package/ffmpeg
-ffmpeg_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ffmpeg_DIR)
-ffmpeg_CFGPARAM = --prefix= \
+ffmpeg_CFGENV = PKG_CONFIG_LIBDIR=$(DESTDIR)/lib/pkgconfig
+ffmpeg_CFGPARAM = --prefix=/ \
     --extra-cflags="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    --extra-ldflags="-L$(DESTDIR)/lib"
+    --extra-ldflags="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+ffmpeg_CFGPARAM += \
+    $(addprefix --enable-,pic runtime-cpudetect hardcoded-tables memalign-hack) \
+    $(addprefix --enable-,pthreads network)
+
 ifeq ("$(PLATFORM)","PI2")
 ffmpeg_CFGPARAM += --enable-cross-compile --target-os=linux \
     --cross_prefix=$(CROSS_COMPILE) --arch=vfpv3 --cpu=cortex-a7
+else ifeq ("$(PLATFORM)","ANDROID")
+ffmpeg_CFGPARAM += --enable-cross-compile --target-os=linux \
+    --cross_prefix=$(CROSS_COMPILE) --arch=arm --cpu=armv5 \
+    --pkg-config=pkg-config
+else
 endif
 
-#ffmpeg_CFGPARAM += --disable-all \
-#    $(addprefix --enable-protocol=,file) \
-#    $(addprefix --enable-decoder=,h264 h264_vdpau mjpeg) \
-#    $(addprefix --enable-decoder=,mpeg4 mpeg4_vdpau) \
-#    $(addprefix --enable-decoder=,pcm_alaw pcm_mulaw adpcm_g726) \
-#    $(addprefix --enable-hwaccel=,h264_vaapi) \
-#    $(addprefix --enable-muxer=,avi mp4 matroska) \
-#    $(addprefix --enable-demuxer=,avi mov) \
-#    $(addprefix --enable-,pic runtime-cpudetect hardcoded-tables) \
-#    $(addprefix --enable-,gpl version3 memalign-hack) \
-#    $(addprefix --enable-,avutil avcodec swscale avformat pthreads) \
-#    $(addprefix --enable-,ffmpeg ffprobe)
+ffmpeg_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ffmpeg_DIR)
 
 ffmpeg: ffmpeg_;
 
 ffmpeg_dir:
 	git clone --depth=1 git://source.ffmpeg.org/ffmpeg.git $(ffmpeg_DIR)
+
+ffmpeg_help:
+	cd $(ffmpeg_DIR) && \
+	  ./configure --help > $(PROJDIR)/ffmpeg.help && \
+	  for i in decoders encoders hwaccels demuxers muxers parsers \
+	      protocols bsfs indevs outdevs filters; do \
+	    ./configure --list-$${i} > $(PROJDIR)/ffmpeg-$${i}.help; \
+	  done
 
 ffmpeg_clean ffmpeg_distclean:
 	if [ -e $(ffmpeg_DIR)/config.mak ]; then \
@@ -406,40 +470,7 @@ ffmpeg%:
 	fi
 	$(ffmpeg_MAKE) $(patsubst _%,%,$(@:ffmpeg%=%))
 
-#------------------------------------
-#
-mpg123_DIR = $(PROJDIR)/package/mpg123
-mpg123_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mpg123_DIR)
-mpg123_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
-    --with-cpu=arm_fpu --disable-id3v2 --disable-icy \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
-
-mpg123: mpg123_;
-
-mpg123_dir:
-	wget -O $(dir $(mpg123_DIR))/mpg123-1.22.1.tar.bz2 \
-	    http://downloads.sourceforge.net/project/mpg123/mpg123/1.22.1/mpg123-1.22.1.tar.bz2
-	cd $(dir $(mpg123_DIR)) && \
-	  tar -jxvf mpg123-1.22.1.tar.bz2 && \
-	  ln -sf mpg123-1.22.1 $(notdir $(mpg123_DIR))
-
-mpg123_clean mpg123_distclean:
-	if [ -e $(mpg123_DIR)/Makefile ]; then \
-	  $(mpg123_MAKE) $(patsubst _%,%,$(@:mpg123%=%)); \
-	fi
-
-mpg123_makefile:
-	cd $(mpg123_DIR) && ./configure $(mpg123_CFGPARAM)
-
-mpg123%:
-	if [ ! -d $(mpg123_DIR) ]; then \
-	  $(MAKE) mpg123_dir; \
-	fi
-	if [ ! -e $(mpg123_DIR)/Makefile ]; then \
-	  $(MAKE) mpg123_makefile; \
-	fi
-	$(mpg123_MAKE) $(patsubst _%,%,$(@:mpg123%=%))
+CLEAN += ffmpeg
 
 #------------------------------------
 #
@@ -476,6 +507,8 @@ openssl%:
 	  $(MAKE) openssl_makefile; \
 	fi
 	$(openssl_MAKE) $(patsubst _%,%,$(@:openssl%=%))
+
+CLEAN += openssl
 
 #------------------------------------
 #
@@ -516,6 +549,8 @@ wpa-supplicant%:
 	$(wpa-supplicant_MAKE) \
 	    $(patsubst _%,%,$(@:wpa-supplicant%=%))
 
+CLEAN += wpa-supplicant
+
 #------------------------------------
 #
 curl_DIR = $(PROJDIR)/package/curl
@@ -550,42 +585,7 @@ curl%:
 	fi
 	$(curl_MAKE) $(patsubst _%,%,$(@:curl%=%))
 
-#------------------------------------
-#
-sox_DIR = $(PROJDIR)/package/sox
-sox_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(sox_DIR)
-sox_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
-
-sox: sox_;
-
-sox_dir:
-	git clone --depth=1 git://git.code.sf.net/p/sox/code $(sox_DIR)
-
-sox_clean sox_distclean:
-	if [ -e $(sox_DIR)/Makefile ]; then \
-	  $(sox_MAKE) $(patsubst _%,%,$(@:sox%=%)); \
-	fi
-
-sox_configure:
-	cd $(sox_DIR) && autoreconf -fiv
-
-sox_makefile:
-	echo "Makefile *** Generate Makefile by configure..."
-	cd $(sox_DIR) && ./configure $(sox_CFGPARAM)
-
-sox%:
-	if [ ! -d $(sox_DIR) ]; then \
-	  $(MAKE) sox_dir; \
-	fi
-	if [ ! -x $(sox_DIR)/configure ]; then \
-	  $(MAKE) sox_configure; \
-	fi
-	if [ ! -e $(sox_DIR)/Makefile ]; then \
-	  $(MAKE) sox_makefile; \
-	fi
-	$(sox_MAKE) $(patsubst _%,%,$(@:sox%=%))
+CLEAN += curl
 
 #------------------------------------
 #
@@ -632,6 +632,8 @@ libmoss%:
 	fi
 	$(libmoss_MAKE) $(patsubst _%,%,$(@:libmoss%=%))
 
+CLEAN += libmoss
+
 #------------------------------------
 #
 webme_DIR = $(PROJDIR)/package/webme
@@ -673,6 +675,8 @@ webme%:
 	fi
 	$(webme_MAKE) $(patsubst _%,%,$(@:webme%=%))
 
+CLEAN += webme
+
 #------------------------------------
 #
 v4l2info_DIR = $(PROJDIR)/package/v4l2info
@@ -684,6 +688,8 @@ v4l2info%:
 	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
 	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
 	    -C $(v4l2info_DIR) $(patsubst _%,%,$(@:v4l2info%=%))
+
+CLEAN += v4l2info
 
 #------------------------------------
 #
@@ -697,6 +703,8 @@ fbinfo%:
 	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
 	    -C $(fbinfo_DIR) $(patsubst _%,%,$(@:fbinfo%=%))
 
+CLEAN += fbinfo
+
 #------------------------------------
 #
 gpioctl-pi_DIR = $(PROJDIR)/package/gpioctl-pi
@@ -708,6 +716,8 @@ gpioctl-pi%:
 	    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
 	    EXTRA_LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
 	    -C $(gpioctl-pi_DIR) $(patsubst _%,%,$(@:gpioctl-pi%=%))
+
+CLEAN += gpioctl-pi
 
 #------------------------------------
 #
@@ -779,6 +789,8 @@ python%:
 	$(python_MAKE) PGEN=$(python-host_DESTDIR)/bin/pgen \
 	    PFRZIMP=$(python-host_DESTDIR)/bin/_freeze_importlib \
 	    $(patsubst _%,%,$(@:python%=%))
+
+CLEAN += python
 
 #------------------------------------
 # git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi
@@ -944,13 +956,6 @@ endif
 	$(MAKE) SRCFILE="libx264.so libx264.so.*" \
 	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
 	    dist_cp
-#	$(MAKE) mpg123_install
-#	$(MAKE) SRCFILE="libmpg123.so libmpg123.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-#	    dist_cp
-#	$(MAKE) SRCFILE="mpg123" \
-#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-#	    dist_cp
 	$(MAKE) SRCFILE="v4l2info" \
 	    SRCDIR=$(DESTDIR)/usr/bin DESTDIR=$(PROJDIR)/userland/usr/bin \
 	    dist_cp
@@ -970,11 +975,10 @@ endif
 .PHONY: userland
 
 dist: linux
-	$(RM) userland obj dist
+	$(RM) dist userland $(DESTDIR) 
 ifeq ("$(PLATFORM)","PI2")
 	$(MAKE) linux_uImage
 else
-	$(RM) $(DESTDIR)
 	$(MAKE) initramfs uboot linux_uImage linux_dtbs
 endif
 	$(RM) $(DESTDIR)
@@ -1024,9 +1028,13 @@ test_%:
 
 #------------------------------------
 #
-install: ;
-	
+clean:
+	$(MAKE) $(addsuffix _$@,$(CLEAN))
+
+distclean:
+	$(MAKE) $(addsuffix _$@,$(CLEAN))
+	$(RM) dist obj userland devlist initramfs initramfs.cpio.gz \
+	  terminfo.tmp
 
 #------------------------------------
 #
-

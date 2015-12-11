@@ -6,6 +6,8 @@ KDIR ?= $(lastword $(wildcard $(DESTDIR)/lib/modules/**/build))
 
 all: modules
 
+distclean: clean;
+
 %:
 	$(MAKE) -C $(KDIR) M=$(PWD) $@
 
