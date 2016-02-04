@@ -77,23 +77,23 @@ COLOR_GRAY = $(call _COLOR,37)
 #------------------------------------
 # $(eval $(call ANDPROJ_PREBUILT_STATIC,<name>,<lib path>,<header path>))
 #
-#define ANDPROJ_PREBUILT_STATIC
-#LOCAL_PATH := $$(ANDPROJ_LOCAL_PATH)
-#include $$(CLEAR_VARS)
-#LOCAL_MODULE := $(1)
-#LOCAL_SRC_FILES := $(2)
-#LOCAL_EXPORT_C_INCLUDES := $(3)
-#include $$(PREBUILT_STATIC_LIBRARY)
-#endef
-#
-#define ANDPROJ_PREBUILT_SHARED
-#LOCAL_PATH := $$(ANDPROJ_LOCAL_PATH)
-#include $$(CLEAR_VARS)
-#LOCAL_MODULE := $(1)
-#LOCAL_SRC_FILES := $(2)
-#LOCAL_EXPORT_C_INCLUDES := $(3)
-#include $$(PREBUILT_SHARED_LIBRARY)
-#endef
+define PROJ_ANDROID_PREBUILT_STATIC
+LOCAL_PATH := $$(ANDPROJ_LOCAL_PATH)
+include $$(CLEAR_VARS)
+LOCAL_MODULE := $(1)
+LOCAL_SRC_FILES := $(2)
+LOCAL_EXPORT_C_INCLUDES := $(3)
+include $$(PREBUILT_STATIC_LIBRARY)
+endef
+
+define PROJ_ANDROID_PREBUILT_SHARED
+LOCAL_PATH := $$(ANDPROJ_LOCAL_PATH)
+include $$(CLEAR_VARS)
+LOCAL_MODULE := $(1)
+LOCAL_SRC_FILES := $(2)
+LOCAL_EXPORT_C_INCLUDES := $(3)
+include $$(PREBUILT_SHARED_LIBRARY)
+endef
 
 #------------------------------------
 #
@@ -102,32 +102,42 @@ COLOR_GRAY = $(call _COLOR,37)
 #	$(CC) -E $(call DEPFLAGS,$@) $(CFLAGS) $<
 #
 #-include $(addsuffix $(DEP),$(ex2_OBJS))
+define PROJ_COMPILE_C
+$$($(1)_OBJ_C): %.o : %.c
+	$$(CC) -c -o $$@ $(or $($(1)_CFLAGS),$$(CFLAGS)) $$<
+	$$(CC) -E $$(call DEPFLAGS,$$@) $(or $($(1)_CFLAGS),$$(CFLAGS)) $$<
+
+-include $$(addsuffix $$(DEP),$$($(1)_OBJ_C))
+endef
+
+define PROJ_COMPILE_CPP
+$$($(1)_OBJ_C): %.o : %.c
+	$$(C++) -c -o $$@ $(or $($(1)_CFLAGS),$$(CFLAGS)) $$<
+	$$(C++) -E $$(call DEPFLAGS,$$@) $(or $($(1)_CFLAGS),$$(CFLAGS)) $$<
+
+-include $$(addsuffix $$(DEP),$$($(1)_OBJ_C))
+endef
 
 #------------------------------------
 #
-#$(ex2_OBJS): %.o : %.c
-#	$(CC) -c -o $@ $(CFLAGS) $<
-#	$(CC) -E $(call DEPFLAGS,$@) $(CFLAGS) $<
-#
-#-include $(addsuffix $(DEP),$(ex2_OBJS))
-
-#------------------------------------
-#
-#dist_cp:
-#	@[ -d $(DESTDIR) ] || $(MKDIR) $(DESTDIR)
-#	@for i in $(SRCFILE); do \
-#	  for j in $(SRCDIR)/$$i; do \
-#	    if [ -x $$j ] && [ ! -h $$j ] && [ ! -d $$j ]; then \
-#	      echo "$(COLOR_GREEN)installing(strip) $$j$(COLOR)"; \
-#	      $(INSTALL_STRIP) $$j $(DESTDIR); \
-#	    elif [ -e $$j ]; then \
-#	      echo "$(COLOR_GREEN)installing(cp) $$j$(COLOR)"; \
-#	      $(RSYNC) -d $$j $(DESTDIR)/; \
-#	    else \
-#	      echo "$(COLOR_RED)missing $$j$(COLOR)"; \
-#	    fi; \
-#	  done; \
-#	done
+define PROJ_DIST_CP
+$(or $(1),dist-cp): PROJ_DIST_CP_MUTE ?= @
+$(or $(1),dist-cp):
+	$(PROJ_DIST_CP_MUTE)[ -d $$(DESTDIR) ] || $$(MKDIR) $$(DESTDIR)
+	$(PROJ_DIST_CP_MUTE)for i in $$(SRCFILE); do \
+	  for j in $$(SRCDIR)/$$$$i; do \
+	    if [ -x $$$$j ] && [ ! -h $$$$j ] && [ ! -d $$$$j ]; then \
+	      echo "$$(COLOR_GREEN)installing(strip) $$$$j$$(COLOR)"; \
+	      $$(INSTALL_STRIP) $$$$j $$(DESTDIR); \
+	    elif [ -e $$$$j ]; then \
+	      echo "$$(COLOR_GREEN)installing(cp) $$$$j$$(COLOR)"; \
+	      $$(RSYNC) -d $$$$j $$(DESTDIR)/; \
+	    else \
+	      echo "$$(COLOR_RED)missing $$$$j$$(COLOR)"; \
+	    fi; \
+	  done; \
+	done
+endef
 
 #------------------------------------
 #
