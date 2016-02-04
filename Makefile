@@ -416,7 +416,8 @@ curl_DIR = $(PROJDIR)/package/curl
 curl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(curl_DIR)
 curl_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` --with-ssl \
     CFLAGS="$(PLATFORM_CFLAGS)" CPPFLAGS="-I$(DESTDIR)/include" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    LIBS="-lcrypto -lssl"
 
 curl: curl_;
 
