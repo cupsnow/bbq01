@@ -381,7 +381,7 @@ CLEAN += libmoss
 #
 iperf_DIR = $(PROJDIR)/package/iperf
 iperf_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(iperf_DIR)
-iperf_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+iperf_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     CPPFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -411,6 +411,7 @@ iperf%:
 	$(iperf_MAKE) $(patsubst _%,%,$(@:iperf%=%))
 
 #------------------------------------
+# dependent: openssl
 #
 curl_DIR = $(PROJDIR)/package/curl
 curl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(curl_DIR)
@@ -448,6 +449,7 @@ curl%:
 CLEAN += curl
 
 #------------------------------------
+# dependent: openssl
 #
 socat_DIR = $(PROJDIR)/package/socat
 socat_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(socat_DIR)
@@ -479,6 +481,333 @@ socat%:
 	  $(MAKE) socat_makefile; \
 	fi
 	$(socat_MAKE) $(patsubst _%,%,$(@:socat%=%))
+
+#------------------------------------
+#
+expat_DIR = $(PROJDIR)/package/expat
+expat_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(expat_DIR)
+expat_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --with-pic \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+expat: expat_;
+
+$(addprefix expat_,clean distclean): ;
+	if [ -e $(expat_DIR)/Makefile ]; then \
+	  $(expat_MAKE) $(patsubst _%,%,$(@:expat%=%)); \
+	fi
+
+expat_dir:
+	cd $(dir $(expat_DIR)) && \
+	  wget http://sourceforge.net/projects/expat/files/expat/2.1.0/expat-2.1.0.tar.gz && \
+	  tar -zxvf expat-2.1.0.tar.gz && \
+	  ln -sf expat-2.1.0 $(expat_DIR)
+
+expat_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(expat_DIR) && $(expat_CFGENV) ./configure $(expat_CFGPARAM)
+
+expat%:
+	if [ ! -d $(expat_DIR) ]; then \
+	  $(MAKE) expat_dir; \
+	fi
+	if [ ! -f $(expat_DIR)/Makefile ]; then \
+	  $(MAKE) expat_makefile; \
+	fi
+	$(expat_MAKE) $(patsubst _%,%,$(@:expat%=%))
+
+#------------------------------------
+#
+libffi_DIR = $(PROJDIR)/package/libffi
+libffi_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libffi_DIR)
+libffi_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --with-pic \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+libffi: libffi_;
+
+libffi_dir:
+	cd $(dir $(libffi_DIR)) && \
+	  wget ftp://sourceware.org/pub/libffi/libffi-3.2.1.tar.gz && \
+	  tar -zxvf libffi-3.2.1.tar.gz && \
+	  ln -sf libffi-3.2.1 $(libffi_DIR)
+
+$(addprefix libffi_,clean distclean): ;
+	if [ -e $(libffi_DIR)/Makefile ]; then \
+	  $(libffi_MAKE) $(patsubst _%,%,$(@:libffi%=%)); \
+	fi
+
+libffi_makefile:
+	cd $(libffi_DIR) && \
+	  $(libffi_CFGENV) ./configure $(libffi_CFGPARAM)
+
+libffi%:
+	if [ ! -d $(libffi_DIR) ]; then \
+	  $(MAKE) libffi_dir; \
+	fi
+	if [ ! -f $(libffi_DIR)/Makefile ]; then \
+	  $(MAKE) libffi_makefile; \
+	fi
+	$(libffi_MAKE) $(patsubst _%,%,$(@:libffi%=%))
+
+#------------------------------------
+#
+libical_DIR = $(PROJDIR)/package/libical
+libical_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libical_DIR)/build
+libical_CFGENV = CC=$(CC) CXX=$(C++) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+libical_CFGPARAM = -DCMAKE_INSTALL_PREFIX=/
+
+libical: libical_;
+
+libical_dir:
+	git clone https://github.com/libical/libical.git $(libical_DIR)
+
+libical_clean:
+	if [ -e $(libical_DIR)/build/Makefile ]; then \
+	  $(libical_MAKE) $(patsubst _%,%,$(@:libical%=%)); \
+	fi
+
+libical_distclean:
+	$(RM) $(libical_DIR)/build
+
+libical_makefile:
+	$(MKDIR) $(libical_DIR)/build && cd $(libical_DIR)/build && \
+	  $(libical_CFGENV) cmake $(libical_CFGPARAM) ..
+
+libical%:
+	if [ ! -d $(libical_DIR) ]; then \
+	  $(MAKE) libical_dir; \
+	fi
+	if [ ! -e $(libical_DIR)/build/Makefile ]; then \
+	  $(MAKE) libical_makefile; \
+	fi
+	$(libical_MAKE) $(patsubst _%,%,$(@:libical%=%))
+
+#------------------------------------
+#
+ncurses_DIR = $(PROJDIR)/package/ncurses
+ncurses_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ncurses_DIR)
+ncurses_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --without-tests --disable-db-install --with-shared --with-cxx-shared \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+ncurses: ncurses_;
+
+ncurses_dir:
+	cd $(dir $(ncurses_DIR)) && \
+	  wget http://ftp.gnu.org/gnu/ncurses/ncurses-6.0.tar.gz && \
+	  tar -zxvf ncurses-6.0.tar.gz && \
+	  ln -sf ncurses-6.0 $(ncurses_DIR)
+
+ncurses_clean ncurses_distclean:
+	if [ -e $(ncurses_DIR)/Makefile ]; then \
+	  $(ncurses_MAKE) $(patsubst _%,%,$(@:ncurses%=%)); \
+	fi
+
+ncurses_makefile:
+	cd $(ncurses_DIR) && ./configure $(ncurses_CFGPARAM)
+
+ncurses-terminfo_TERMLIST ?= ansi, linux, vt100, vt102, vt220, xterm
+ncurses-terminfo_DESTDIR ?= $(DESTDIR)/etc/terminfo
+ncurses-terminfo_install:
+	echo "ncurses-terminfo_TERMLIST: $(ncurses-terminfo_TERMLIST)"
+	echo "ncurses-terminfo_DIR: $(ncurses-terminfo_DIR)"
+	tic -s -1 -I -e"$(ncurses-terminfo_TERMLIST)" \
+	    $(ncurses_DIR)/misc/terminfo.src > terminfo.tmp
+	$(MKDIR) $(ncurses-terminfo_DESTDIR)
+	tic -s -o $(ncurses-terminfo_DESTDIR) terminfo.tmp
+
+ncurses%:
+	if [ ! -d $(ncurses_DIR) ]; then \
+	  $(MAKE) ncurses_dir; \
+	fi
+	if [ ! -e $(ncurses_DIR)/Makefile ]; then \
+	  $(MAKE) ncurses_makefile; \
+	fi
+	$(ncurses_MAKE) $(patsubst _%,%,$(@:ncurses%=%))
+
+#------------------------------------
+# dependency: ncurses
+#
+readline_DIR = $(PROJDIR)/package/readline
+readline_MAKE = $(MAKE) DESTDIR=$(DESTDIR) SHLIB_LIBS=-lncurses -C $(readline_DIR)
+readline_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    bash_cv_wcwidth_broken=yes \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+readline: readline_;
+
+readline_dir:
+	cd $(dir $(readline_DIR)) && \
+	wget ftp://ftp.cwru.edu/pub/bash/readline-6.3.tar.gz && \
+	    tar -zxvf readline-6.3.tar.gz && \
+	    ln -sf readline-6.3 readline
+
+readline_clean readline_distclean:
+	if [ -e $(readline_DIR)/Makefile ]; then \
+	  $(readline_MAKE) $(patsubst _%,%,$(@:readline%=%)); \
+	fi
+
+readline_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(readline_DIR) && ./configure $(readline_CFGPARAM)
+
+readline%:
+	if [ ! -d $(readline_DIR) ]; then \
+	  $(MAKE) readline_dir; \
+	fi
+	if [ ! -e $(readline_DIR)/Makefile ]; then \
+	  $(MAKE) readline_makefile; \
+	fi
+	$(readline_MAKE) $(patsubst _%,%,$(@:readline%=%))
+	if [ "$(patsubst _%,%,$(@:readline%=%))" = "install" ]; then \
+	  for i in libhistory.old libhistory.so.6.3.old \
+	      libreadline.old libreadline.so.6.3.old; do \
+	    $(RM) $(DESTDIR)/lib/$$i; \
+	  done; \
+	fi
+
+#------------------------------------
+# dependent: libffi zlib
+#
+glib_DIR = $(PROJDIR)/package/glib
+glib_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(glib_DIR)
+glib_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --with-pic --enable-static --cache-file=$(glib_CFGCACHE) \
+    glib_cv_stack_grows=no glib_cv_uscore=yes \
+    ac_cv_func_posix_getpwuid_r=yes ac_cv_func_posix_getgrgid_r=yes \
+    LIBFFI_CFLAGS="-I$(dir $(wildcard $(DESTDIR)/lib/libffi-*/include/ffi.h))" \
+    LIBFFI_LIBS="-L$(DESTDIR)/lib -lffi" \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lffi"
+
+glib: glib_;
+
+glib_dir:
+	cd $(dir $(glib_DIR)) && \
+	  wget http://ftp.gnome.org/pub/gnome/sources/glib/2.46/glib-2.46.2.tar.xz && \
+	  tar -Jxvf glib-2.46.2.tar.xz && \
+	  ln -sf glib-2.46.2 $(glib_DIR)
+
+$(addprefix glib_,clean distclean): ;
+	if [ -e $(glib_DIR)/Makefile ]; then \
+	  $(glib_MAKE) $(patsubst _%,%,$(@:glib%=%)); \
+	fi
+
+glib_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(glib_DIR) && $(glib_CFGENV) ./configure $(glib_CFGPARAM)
+
+glib%:
+	if [ ! -d $(glib_DIR) ]; then \
+	  $(MAKE) glib_dir; \
+	fi
+	if [ ! -f $(glib_DIR)/Makefile ]; then \
+	  $(MAKE) glib_makefile; \
+	fi
+	$(glib_MAKE) $(patsubst _%,%,$(@:glib%=%))
+
+#------------------------------------
+# dependent: expat
+#
+dbus_DIR = $(PROJDIR)/package/dbus
+dbus_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(dbus_DIR)
+dbus_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+    --with-pic --enable-abstract-sockets \
+    $(addprefix --disable-,tests) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+dbus: dbus_;
+
+dbus_dir:
+	cd $(dir $(dbus_DIR)) && \
+	  wget http://dbus.freedesktop.org/releases/dbus/dbus-1.11.0.tar.gz && \
+	  tar -zxvf dbus-1.11.0.tar.gz && \
+	  ln -sf dbus-1.11.0 $(dbus_DIR)
+
+$(addprefix dbus_,clean distclean): ;
+	if [ -e $(dbus_DIR)/Makefile ]; then \
+	  $(dbus_MAKE) $(patsubst _%,%,$(@:dbus%=%)); \
+	fi
+
+dbus_makefile:
+	echo "Makefile *** Generate Makefile by configure..."
+	cd $(dbus_DIR) && $(dbus_CFGENV) ./configure $(dbus_CFGPARAM)
+
+dbus%:
+	if [ ! -d $(dbus_DIR) ]; then \
+	  $(MAKE) dbus_dir; \
+	fi
+	if [ ! -f $(dbus_DIR)/Makefile ]; then \
+	  $(MAKE) dbus_makefile; \
+	fi
+	$(dbus_MAKE) $(patsubst _%,%,$(@:dbus%=%))
+
+#------------------------------------
+# dependent: glib readline, libical, dbus
+#
+bluez_DIR = $(PROJDIR)/package/bluez
+bluez_MAKE = $(MAKE) DESTDIR=$(DESTDIR) V=1 -C $(bluez_DIR)
+#bluez_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+#    --with-pic $(addprefix --enable-,static library threads pie) \
+#    $(addprefix --disable-,udev cups systemd) \
+#    --with-dbusconfdir=/etc \
+#    --with-dbussystembusdir=/share/dbus-1/system-services \
+#    --with-dbussessionbusdir=/share/dbus-1/services \
+#    DBUS_CFLAGS="-I$(DESTDIR)/include/dbus-1.0 -I$(DESTDIR)/lib/dbus-1.0/include" \
+#    DBUS_LIBS="-L$(DESTDIR)/lib -ldbus-1" \
+#    ICAL_CFLAGS="-I$(DESTDIR)/include" \
+#    ICAL_LIBS="-L$(DESTDIR)/lib -lical -licalss -licalvcal -lpthread" \
+#    CFLAGS="$(PLATFORM_CFLAGS)" CPPFLAGS="-I$(DESTDIR)/include" \
+#    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lncurses"
+bluez_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --with-pic $(addprefix --enable-,static threads pie) \
+    $(addprefix --disable-,test udev cups systemd) \
+    --with-dbusconfdir=/etc \
+    --with-dbussystembusdir=/share/dbus-1/system-services \
+    --with-dbussessionbusdir=/share/dbus-1/services \
+    DBUS_CFLAGS="-I$(DESTDIR)/include/dbus-1.0 -I$(DESTDIR)/lib/dbus-1.0/include" \
+    DBUS_LIBS="-L$(DESTDIR)/lib -ldbus-1" \
+    ICAL_CFLAGS="-I$(DESTDIR)/include" \
+    ICAL_LIBS="-L$(DESTDIR)/lib -lical -licalss -licalvcal -lpthread" \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lncurses"
+
+bluez: bluez_;
+
+bluez_dir:
+	cd $(dir $(bluez_DIR)) && \
+	  wget http://www.kernel.org/pub/linux/bluetooth/bluez-5.37.tar.xz && \
+	  tar -Jxvf bluez-5.37.tar.xz && \
+	  ln -sf bluez-5.37 $(bluez_DIR)
+
+$(addprefix bluez_,clean distclean): ;
+	if [ -e $(bluez_DIR)/Makefile ]; then \
+	  $(bluez_MAKE) $(patsubst _%,%,$(@:bluez%=%)); \
+	fi
+
+bluez_makefile:
+	cd $(bluez_DIR) && ./configure $(bluez_CFGPARAM)
+
+bluez%:
+	if [ ! -d $(bluez_DIR) ]; then \
+	  $(MAKE) bluez_dir; \
+	fi
+	if [ ! -e $(bluez_DIR)/Makefile ]; then \
+	  $(MAKE) bluez_makefile; \
+	fi
+	$(bluez_MAKE) $(patsubst _%,%,$(@:bluez%=%))
+	if [ "$(patsubst _%,%,$(@:bluez%=%))" = "install" ]; then \
+	  [ -d $(DESTDIR)/etc/bluetooth ] || $(MKDIR) $(DESTDIR)/etc/bluetooth; \
+	  $(CP) $(bluez_DIR)/src/main.conf $(DESTDIR)/etc/bluetooth/; \
+	fi
 
 #------------------------------------
 #
@@ -520,7 +849,7 @@ CLEAN += libevent
 #
 libnl_DIR = $(PROJDIR)/package/libnl
 libnl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libnl_DIR)
-libnl_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) --disable-cli \
+libnl_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` --disable-cli \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -718,10 +1047,6 @@ wpa-supplicant%:
 	    $(patsubst _%,%,$(@:wpa-supplicant%=%))
 
 CLEAN += wpa-supplicant
-
-#------------------------------------
-#
-include bluez.mk
 
 #------------------------------------
 #
@@ -949,11 +1274,10 @@ ifeq ("$(PLATFORM)","PI2")
 	    DESTDIR=$(userland_DIR) prebuilt
 endif
 
-userland: tool linux_headers_install
+userland: tool $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf)
 	for i in proc sys dev tmp var/run; do \
 	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
-	$(MAKE) $(addsuffix _install,zlib bzip2 json-c libmoss iperf)
 	$(MAKE) $(addsuffix _install,openssl)
 	$(MAKE) $(addsuffix _install,curl socat)
 	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
@@ -963,122 +1287,85 @@ ifeq ("$(PLATFORM)","PI2")
 	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-pi/*" \
 	    DESTDIR=$(userland_DIR) prebuilt
 endif
-	$(MAKE) SRCFILE="bunzip2 bzcat bzip2 bzmore curl iperf3 openssl socat" \
+	# bzip iperf openssl curl
+	$(MAKE) SRCFILE="bunzip2 bzcat bzcmp bzdiff bzegrep bzfgrep bzgrep" \
+	    SRCFILE+="bzip2 bzip2recover bzless bzmore iperf3 openssl" \
+	    SRCFILE+="curl" \
 	    SRCDIR=$(DESTDIR)/bin \
 	    DESTDIR=$(userland_DIR)/bin dist-cp
-	$(MAKE) SRCFILE="libz.so libz.so.* engines libcrypto.so libcrypto.so.*" \
-	    SRCFILE+="libssl.so libssl.so.* libjson-c.so libjson-c.so.*" \
-	    SRCFILE+="libcurl.so libcurl.so.* libiperf.so libiperf.so.*" \
-	    SRCFILE+="libmoss.so libmoss.so.*" \
+	# libz json-c libmoss iperf openssl curl
+	$(MAKE) SRCFILE="libz.so libz.so.* libjson-c.so libjson-c.so.*" \
+	    SRCFILE+="libmoss.so libmoss.so.* libiperf.so libiperf.so.*" \
+	    SRCFILE+="libcrypto.so libcrypto.so.* libssl.so libssl.so.* engines" \
+	    SRCFILE+="libcurl.so libcurl.so.*" \
 	    SRCDIR=$(DESTDIR)/lib \
 	    DESTDIR=$(userland_DIR)/lib dist-cp
+	# openssl
 	$(MAKE) SRCFILE="openssl" \
 	    SRCDIR=$(DESTDIR)/usr \
 	    DESTDIR=$(userland_DIR)/usr dist-cp
 
-
-#	$(MAKE) DESTDIR=$(userland_DIR) \
-#	    so1 so2 busybox_install linux_modules_install
-#ifeq ("$(PLATFORM)","PI2")
-#	$(MAKE) DESTDIR=$(userland_DIR) \
-#	    PREBUILT="$(PROJDIR)/prebuilt/userland/* $(PROJDIR)/prebuilt/userland-pi/*" \
-#	    prebuilt
-#	$(MAKE) hx711-drv
-#	$(MAKE) DESTDIR=$(userland_DIR) hx711-drv_modules_install
-#else
-#	$(MAKE) DESTDIR=$(userland_DIR) \
-#	    PREBUILT="$(PROJDIR)/prebuilt/userland/*" prebuilt
-#endif
-#	$(MAKE) zlib_install libmoss_install
-#	$(MAKE) SRCFILE="libz.so libz.so.* libmoss.so libmoss.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(userland_DIR)/lib \
-#	    dist-cp
-#	$(MAKE) libnl_install
-#	$(MAKE) SRCFILE="libnl-*.so libnl-*.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(userland_DIR)/lib \
-#	    dist-cp
-#	$(MAKE) openssl_install
-#	$(MAKE) SRCFILE="openssl" \
-#	    SRCDIR=$(DESTDIR)/usr DESTDIR=$(userland_DIR)/usr \
-#	    dist-cp
-#	$(MAKE) SRCFILE="openssl" \
-#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(userland_DIR)/bin \
-#	    dist-cp
-#	$(MAKE) curl_install
-#	$(MAKE) SRCFILE="libcurl.so libcurl.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(userland_DIR)/lib \
-#	    dist-cp
-#	$(MAKE) SRCFILE="curl" \
-#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(userland_DIR)/bin \
-#	    dist-cp
-#	$(MAKE) libevent_install libjpeg-turbo_install json-c_install \
-#	    x264_install v4l2info_install
-#	$(MAKE) SRCFILE="libevent.so libevent-*.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(userland_DIR)/lib \
-#	    dist-cp
-#	$(MAKE) SRCFILE="libturbojpeg.so libturbojpeg.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(userland_DIR)/lib \
-#	    dist-cp
-#	$(MAKE) SRCFILE="libjson-c.so libjson-c.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(userland_DIR)/lib \
-#	    dist-cp
-#	$(MAKE) SRCFILE="libx264.so libx264.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(userland_DIR)/lib \
-#	    dist-cp
-#	$(MAKE) SRCFILE="v4l2info" \
-#	    SRCDIR=$(DESTDIR)/usr/bin DESTDIR=$(userland_DIR)/usr/bin \
-#	    dist-cp
-#ifeq ("$(PLATFORM)","PI2")
-#	$(MAKE) gpioctl-pi_install
-#	$(MAKE) SRCFILE="gpioctl" \
-#	    SRCDIR=$(DESTDIR)/usr/bin DESTDIR=$(userland_DIR)/usr/bin \
-#	    dist-cp
-#else
-#endif
-#	$(MAKE) wpa-supplicant_install
-#	$(MAKE) SRCFILE="wpa_*" \
-#	    SRCDIR=$(DESTDIR)/usr/sbin DESTDIR=$(userland_DIR)/usr/sbin \
-#	    dist-cp
-#	$(MAKE) userland-bt
-
-userland-bt: tool
-	for i in proc sys dev tmp var/run var/lib; do \
-	  [ -d $(PROJDIR)/userland/$$i ] || $(MKDIR) $(PROJDIR)/userland/$$i; \
-	done
-	$(MAKE) zlib_install expat_install libical_install ncurses_install \
-	    libffi_install
+userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
+	$(MAKE) $(addsuffix _install,readline glib dbus)
+	$(MAKE) $(addsuffix _install,bluez)
+	# expat ncurses
+	$(MAKE) SRCFILE="xmlwf captoinfo clear infocmp infotocap" \
+	    SRCFILE+="ncurses6-config reset tabs tic toe tput tset" \
+	    SRCDIR=$(DESTDIR)/bin \
+	    DESTDIR=$(userland_DIR)/bin dist-cp
+	# bzip expat libffi libical ncurses
 	$(MAKE) SRCFILE="libz.so libz.so.* libexpat.so libexpat.so.*" \
-	    SRCFILE+="libical.so libical.so.* libical_cxx.so libical_cxx.so.*" \
-	    SRCFILE+="libicalss.so libicalss.so.* libicalss_cxx.so libicalss_cxx.so.*" \
-	    SRCFILE+="libicalvcal.so libicalvcal.so.*" \
-	    SRCFILE+="libform.so libform.so.* libmenu.so libmenu.so.* libpanel.so libpanel.so.*" \
-	    SRCFILE+="libncurses.so libncurses.so.* libncurses++.so libncurses++.so.*" \
 	    SRCFILE+="libffi.so libffi.so.*" \
-	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-	    dist-cp
-	$(MAKE) TERMLIST="ansi, linux, vt100, vt102, vt220, xterm" \
-	    DESTDIR=$(PROJDIR)/userland ncurses_install-terminfo
-	$(MAKE) readline_install glib_install dbus_install
-	$(MAKE) SRCFILE="libreadline.so libreadline.so.* libhistory.so libhistory.so.*" \
-	    SRCFILE+="libgio-*.so libgio-*.so.* libglib-*.so libglib-*.so.*" \
-	    SRCFILE+="libgmodule-*.so libgmodule-*.so.* libgobject-*.so libgobject-*.so.*" \
-	    SRCFILE+="libgthread-*.so libgthread-*.so.*" \
-	    SRCFILE+="libdbus-*.so libdbus-*.so.*" \
-	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-	    dist-cp
-	$(MAKE) SRCFILE="dbus-daemon dbus-send" \
-	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-	    dist-cp
-	$(MAKE) bluez_install
-	$(MAKE) SRCFILE="libbluetooth.so libbluetooth.so.*" \
-	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-	    dist-cp
-	$(MAKE) SRCFILE="bluetoothd" \
-	    SRCDIR=$(DESTDIR)/libexec/bluetooth DESTDIR=$(PROJDIR)/userland/bin \
-	    dist-cp
-	$(MAKE) SRCFILE="hciconfig hcitool bluetoothctl" \
-	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-	    dist-cp
+	    SRCFILE+="libical.so libical.so.* libicalss.so libicalss.so.* libicalvcal.so libicalvcal.so.*" \
+	    SRCFILE+="libical_cxx.so libical_cxx.so.* libicalss_cxx.so libicalss_cxx.so.*" \
+	    SRCFILE+="" \
+	    SRCDIR=$(DESTDIR)/lib \
+	    DESTDIR=$(userland_DIR)/lib dist-cp
+	    
+	$(MAKE) SRCFILE="bluetooth dbus-1" \
+	    SRCDIR=$(DESTDIR)/etc \
+	    DESTDIR=$(userland_DIR)/etc dist-cp
+	$(MAKE) SRCFILE="libz.so libz.so.*" \
+	    SRCDIR=$(DESTDIR)/lib \
+	    DESTDIR=$(userland_DIR)/lib dist-cp
+
+#	for i in proc sys dev tmp var/run var/lib; do \
+#	  [ -d $(PROJDIR)/userland/$$i ] || $(MKDIR) $(PROJDIR)/userland/$$i; \
+#	done
+#	$(MAKE) zlib_install expat_install libical_install ncurses_install \
+#	    libffi_install
+#	$(MAKE) SRCFILE="libz.so libz.so.* libexpat.so libexpat.so.*" \
+#	    SRCFILE+="libical.so libical.so.* libical_cxx.so libical_cxx.so.*" \
+#	    SRCFILE+="libicalss.so libicalss.so.* libicalss_cxx.so libicalss_cxx.so.*" \
+#	    SRCFILE+="libicalvcal.so libicalvcal.so.*" \
+#	    SRCFILE+="libform.so libform.so.* libmenu.so libmenu.so.* libpanel.so libpanel.so.*" \
+#	    SRCFILE+="libncurses.so libncurses.so.* libncurses++.so libncurses++.so.*" \
+#	    SRCFILE+="libffi.so libffi.so.*" \
+#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+#	    dist-cp
+#	$(MAKE) TERMLIST="ansi, linux, vt100, vt102, vt220, xterm" \
+#	    DESTDIR=$(PROJDIR)/userland ncurses_install-terminfo
+#	$(MAKE) readline_install glib_install dbus_install
+#	$(MAKE) SRCFILE="libreadline.so libreadline.so.* libhistory.so libhistory.so.*" \
+#	    SRCFILE+="libgio-*.so libgio-*.so.* libglib-*.so libglib-*.so.*" \
+#	    SRCFILE+="libgmodule-*.so libgmodule-*.so.* libgobject-*.so libgobject-*.so.*" \
+#	    SRCFILE+="libgthread-*.so libgthread-*.so.*" \
+#	    SRCFILE+="libdbus-*.so libdbus-*.so.*" \
+#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+#	    dist-cp
+#	$(MAKE) SRCFILE="dbus-daemon dbus-send" \
+#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+#	    dist-cp
+#	$(MAKE) bluez_install
+#	$(MAKE) SRCFILE="libbluetooth.so libbluetooth.so.*" \
+#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+#	    dist-cp
+#	$(MAKE) SRCFILE="bluetoothd" \
+#	    SRCDIR=$(DESTDIR)/libexec/bluetooth DESTDIR=$(PROJDIR)/userland/bin \
+#	    dist-cp
+#	$(MAKE) SRCFILE="hciconfig hcitool bluetoothctl" \
+#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+#	    dist-cp
 
 .PHONY: userland
 
