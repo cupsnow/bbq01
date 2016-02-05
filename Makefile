@@ -923,10 +923,8 @@ prebuilt:
 
 .PHONY: prebuilt
 
-initramfs_DIR ?= $(PROJDIR)/.initramfs
-initramfs: tool
-	$(MAKE) linux_headers_install
-	$(MAKE) busybox
+initramfs_DIR ?= $(PROJDIR)/initramfs
+initramfs: tool linux_headers_install
 	$(MAKE) PREBUILT=$(PROJDIR)/prebuilt/initramfs/* \
 	    DESTDIR=$(initramfs_DIR) \
 	    devlist so1 prebuilt busybox_install
@@ -934,49 +932,22 @@ initramfs: tool
 	    -o $(PROJDIR)/initramfs.cpio.gz \
 	    $(PROJDIR)/devlist $(initramfs_DIR)
 	mkimage -n 'bbq01 initramfs' -A arm -O linux -T ramdisk -C gzip \
-	    -d $(PROJDIR)/initramfs.cpio.gz $(PROJDIR)/initramfs
+	    -d $(PROJDIR)/initramfs.cpio.gz $(PROJDIR)/uInitramfs
 
 .PHONY: initramfs
 
 userland_DIR ?= $(PROJDIR)/userland
-userland-bt: tool
-	for i in proc sys dev tmp var/run var/lib; do \
-	  [ -d $(PROJDIR)/userland/$$i ] || $(MKDIR) $(PROJDIR)/userland/$$i; \
+userland0: tool linux_headers_install
+	for i in proc sys dev tmp var/run; do \
+	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
-	$(MAKE) zlib_install expat_install libical_install ncurses_install \
-	    libffi_install
-	$(MAKE) SRCFILE="libz.so libz.so.* libexpat.so libexpat.so.*" \
-	    SRCFILE+="libical.so libical.so.* libical_cxx.so libical_cxx.so.*" \
-	    SRCFILE+="libicalss.so libicalss.so.* libicalss_cxx.so libicalss_cxx.so.*" \
-	    SRCFILE+="libicalvcal.so libicalvcal.so.*" \
-	    SRCFILE+="libform.so libform.so.* libmenu.so libmenu.so.* libpanel.so libpanel.so.*" \
-	    SRCFILE+="libncurses.so libncurses.so.* libncurses++.so libncurses++.so.*" \
-	    SRCFILE+="libffi.so libffi.so.*" \
-	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-	    dist-cp
-	$(MAKE) TERMLIST="ansi, linux, vt100, vt102, vt220, xterm" \
-	    DESTDIR=$(PROJDIR)/userland ncurses_install-terminfo
-	$(MAKE) readline_install glib_install dbus_install
-	$(MAKE) SRCFILE="libreadline.so libreadline.so.* libhistory.so libhistory.so.*" \
-	    SRCFILE+="libgio-*.so libgio-*.so.* libglib-*.so libglib-*.so.*" \
-	    SRCFILE+="libgmodule-*.so libgmodule-*.so.* libgobject-*.so libgobject-*.so.*" \
-	    SRCFILE+="libgthread-*.so libgthread-*.so.*" \
-	    SRCFILE+="libdbus-*.so libdbus-*.so.*" \
-	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-	    dist-cp
-	$(MAKE) SRCFILE="dbus-daemon dbus-send" \
-	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-	    dist-cp
-	$(MAKE) bluez_install
-	$(MAKE) SRCFILE="libbluetooth.so libbluetooth.so.*" \
-	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-	    dist-cp
-	$(MAKE) SRCFILE="bluetoothd" \
-	    SRCDIR=$(DESTDIR)/libexec/bluetooth DESTDIR=$(PROJDIR)/userland/bin \
-	    dist-cp
-	$(MAKE) SRCFILE="hciconfig hcitool bluetoothctl" \
-	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-	    dist-cp
+	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
+	    DESTDIR=$(userland_DIR) so1 so2 prebuilt \
+	    $(addsuffix _install,busybox)
+ifeq ("$(PLATFORM)","PI2")
+	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-pi/*" \
+	    DESTDIR=$(userland_DIR) prebuilt
+endif
 
 userland: tool linux_headers_install
 	for i in proc sys dev tmp var/run; do \
@@ -985,9 +956,26 @@ userland: tool linux_headers_install
 	$(MAKE) $(addsuffix _install,zlib bzip2 json-c libmoss iperf)
 	$(MAKE) $(addsuffix _install,openssl)
 	$(MAKE) $(addsuffix _install,curl socat)
-	$(MAKE) SRCFILE="libz.so libz.so.* libcurl.so libcurl.so.*" \
+	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
+	    DESTDIR=$(userland_DIR) so1 so2 prebuilt \
+	    $(addsuffix _install,linux_modules busybox)
+ifeq ("$(PLATFORM)","PI2")
+	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-pi/*" \
+	    DESTDIR=$(userland_DIR) prebuilt
+endif
+	$(MAKE) SRCFILE="bunzip2 bzcat bzip2 bzmore curl iperf3 openssl socat" \
+	    SRCDIR=$(DESTDIR)/bin \
+	    DESTDIR=$(userland_DIR)/bin dist-cp
+	$(MAKE) SRCFILE="libz.so libz.so.* engines libcrypto.so libcrypto.so.*" \
+	    SRCFILE+="libssl.so libssl.so.* libjson-c.so libjson-c.so.*" \
+	    SRCFILE+="libcurl.so libcurl.so.* libiperf.so libiperf.so.*" \
+	    SRCFILE+="libmoss.so libmoss.so.*" \
 	    SRCDIR=$(DESTDIR)/lib \
 	    DESTDIR=$(userland_DIR)/lib dist-cp
+	$(MAKE) SRCFILE="openssl" \
+	    SRCDIR=$(DESTDIR)/usr \
+	    DESTDIR=$(userland_DIR)/usr dist-cp
+
 
 #	$(MAKE) DESTDIR=$(userland_DIR) \
 #	    so1 so2 busybox_install linux_modules_install
@@ -1052,6 +1040,45 @@ userland: tool linux_headers_install
 #	    SRCDIR=$(DESTDIR)/usr/sbin DESTDIR=$(userland_DIR)/usr/sbin \
 #	    dist-cp
 #	$(MAKE) userland-bt
+
+userland-bt: tool
+	for i in proc sys dev tmp var/run var/lib; do \
+	  [ -d $(PROJDIR)/userland/$$i ] || $(MKDIR) $(PROJDIR)/userland/$$i; \
+	done
+	$(MAKE) zlib_install expat_install libical_install ncurses_install \
+	    libffi_install
+	$(MAKE) SRCFILE="libz.so libz.so.* libexpat.so libexpat.so.*" \
+	    SRCFILE+="libical.so libical.so.* libical_cxx.so libical_cxx.so.*" \
+	    SRCFILE+="libicalss.so libicalss.so.* libicalss_cxx.so libicalss_cxx.so.*" \
+	    SRCFILE+="libicalvcal.so libicalvcal.so.*" \
+	    SRCFILE+="libform.so libform.so.* libmenu.so libmenu.so.* libpanel.so libpanel.so.*" \
+	    SRCFILE+="libncurses.so libncurses.so.* libncurses++.so libncurses++.so.*" \
+	    SRCFILE+="libffi.so libffi.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist-cp
+	$(MAKE) TERMLIST="ansi, linux, vt100, vt102, vt220, xterm" \
+	    DESTDIR=$(PROJDIR)/userland ncurses_install-terminfo
+	$(MAKE) readline_install glib_install dbus_install
+	$(MAKE) SRCFILE="libreadline.so libreadline.so.* libhistory.so libhistory.so.*" \
+	    SRCFILE+="libgio-*.so libgio-*.so.* libglib-*.so libglib-*.so.*" \
+	    SRCFILE+="libgmodule-*.so libgmodule-*.so.* libgobject-*.so libgobject-*.so.*" \
+	    SRCFILE+="libgthread-*.so libgthread-*.so.*" \
+	    SRCFILE+="libdbus-*.so libdbus-*.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist-cp
+	$(MAKE) SRCFILE="dbus-daemon dbus-send" \
+	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+	    dist-cp
+	$(MAKE) bluez_install
+	$(MAKE) SRCFILE="libbluetooth.so libbluetooth.so.*" \
+	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
+	    dist-cp
+	$(MAKE) SRCFILE="bluetoothd" \
+	    SRCDIR=$(DESTDIR)/libexec/bluetooth DESTDIR=$(PROJDIR)/userland/bin \
+	    dist-cp
+	$(MAKE) SRCFILE="hciconfig hcitool bluetoothctl" \
+	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
+	    dist-cp
 
 .PHONY: userland
 
