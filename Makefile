@@ -151,7 +151,7 @@ busybox: busybox_;
 
 busybox_dir:
 	cd $(dir $(busybox_DIR)) && \
-	  wget http://busybox.net/downloads/busybox-1.24.1.tar.bz2 && \
+	  wget https://www.busybox.net/downloads/busybox-1.24.1.tar.bz2 && \
 	  tar -jxvf busybox-1.24.1.tar.bz2 && \
 	  ln -sf busybox-1.24.1 $(busybox_DIR)
 
@@ -163,6 +163,9 @@ busybox_clean busybox_distclean:
 	$(busybox_MAKE) $(patsubst _%,%,$(@:busybox%=%))
 
 busybox%:
+	if [ ! -d $(busybox_DIR) ]; then \
+	  $(MAKE) busybox_dir; \
+	fi
 	if [ ! -f $(busybox_DIR)/.config ]; then \
 	  $(MAKE) busybox_config; \
 	fi
@@ -591,8 +594,10 @@ libical%:
 #
 ncurses_DIR = $(PROJDIR)/package/ncurses
 ncurses_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ncurses_DIR)
+#ncurses_TERMINFODIR = /etc/terminfo
 ncurses_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    --without-tests --disable-db-install --with-shared --with-cxx-shared \
+    --without-tests --with-shared --with-cxx-shared \
+    $(ncurses_TERMINFODIR:%=--with-default-terminfo-dir=%) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -611,16 +616,6 @@ ncurses_clean ncurses_distclean:
 
 ncurses_makefile:
 	cd $(ncurses_DIR) && ./configure $(ncurses_CFGPARAM)
-
-ncurses-terminfo_TERMLIST ?= ansi, linux, vt100, vt102, vt220, xterm
-ncurses-terminfo_DESTDIR ?= $(DESTDIR)/etc/terminfo
-ncurses-terminfo_install:
-	echo "ncurses-terminfo_TERMLIST: $(ncurses-terminfo_TERMLIST)"
-	echo "ncurses-terminfo_DIR: $(ncurses-terminfo_DIR)"
-	tic -s -1 -I -e"$(ncurses-terminfo_TERMLIST)" \
-	    $(ncurses_DIR)/misc/terminfo.src > terminfo.tmp
-	$(MKDIR) $(ncurses-terminfo_DESTDIR)
-	tic -s -o $(ncurses-terminfo_DESTDIR) terminfo.tmp
 
 ncurses%:
 	if [ ! -d $(ncurses_DIR) ]; then \
@@ -718,7 +713,7 @@ glib%:
 #
 dbus_DIR = $(PROJDIR)/package/dbus
 dbus_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(dbus_DIR)
-dbus_CFGPARAM = --prefix= --host=$(shell PATH=$(PATH) $(CC) -dumpmachine) \
+dbus_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     --with-pic --enable-abstract-sockets \
     $(addprefix --disable-,tests) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
@@ -773,6 +768,10 @@ bluez_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     --with-dbusconfdir=/etc \
     --with-dbussystembusdir=/share/dbus-1/system-services \
     --with-dbussessionbusdir=/share/dbus-1/services \
+    GLIB_CFLAGS="-I$(DESTDIR)/include/glib-2.0 -I$(DESTDIR)/lib/glib-2.0/include" \
+    GLIB_LIBS="-L$(DESTDIR)/lib -lglib-2.0" \
+    GTHREAD_CFLAGS="-I$(DESTDIR)/include/glib-2.0" \
+    GTHREAD_LIBS="-L$(DESTDIR)/lib -lgthread-2.0" \
     DBUS_CFLAGS="-I$(DESTDIR)/include/dbus-1.0 -I$(DESTDIR)/lib/dbus-1.0/include" \
     DBUS_LIBS="-L$(DESTDIR)/lib -ldbus-1" \
     ICAL_CFLAGS="-I$(DESTDIR)/include" \
@@ -1249,7 +1248,7 @@ prebuilt:
 .PHONY: prebuilt
 
 initramfs_DIR ?= $(PROJDIR)/initramfs
-initramfs: tool linux_headers_install
+uInitramfs: tool linux_headers_install
 	$(MAKE) PREBUILT=$(PROJDIR)/prebuilt/initramfs/* \
 	    DESTDIR=$(initramfs_DIR) \
 	    devlist so1 prebuilt busybox_install
@@ -1257,9 +1256,9 @@ initramfs: tool linux_headers_install
 	    -o $(PROJDIR)/initramfs.cpio.gz \
 	    $(PROJDIR)/devlist $(initramfs_DIR)
 	mkimage -n 'bbq01 initramfs' -A arm -O linux -T ramdisk -C gzip \
-	    -d $(PROJDIR)/initramfs.cpio.gz $(PROJDIR)/uInitramfs
+	    -d $(PROJDIR)/initramfs.cpio.gz $@
 
-.PHONY: initramfs
+.PHONY: uInitramfs
 
 userland_DIR ?= $(PROJDIR)/userland
 userland0: tool linux_headers_install
@@ -1274,7 +1273,7 @@ ifeq ("$(PLATFORM)","PI2")
 	    DESTDIR=$(userland_DIR) prebuilt
 endif
 
-userland: tool $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf)
+userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf)
 	for i in proc sys dev tmp var/run; do \
 	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
@@ -1305,79 +1304,59 @@ endif
 	    SRCDIR=$(DESTDIR)/usr \
 	    DESTDIR=$(userland_DIR)/usr dist-cp
 
+.PHONY: userland
+
 userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
 	$(MAKE) $(addsuffix _install,readline glib dbus)
 	$(MAKE) $(addsuffix _install,bluez)
-	# expat ncurses
-	$(MAKE) SRCFILE="xmlwf captoinfo clear infocmp infotocap" \
-	    SRCFILE+="ncurses6-config reset tabs tic toe tput tset" \
+	# dbus
+	for i in var/run/dbus var/lib/dbus; do \
+	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
+	done
+	# expat ncurses glib dbus bluez
+	$(MAKE) SRCFILE="xmlwf captoinfo clear infocmp infotocap ncurses6-config" \
+	    SRCFILE+="reset tabs tic toe tput tset" \
+	    SRCFILE+="gapplication gdbus gdbus-codegen gio-querymodules" \
+	    SRCFILE+="glib-compile-resources glib-compile-schemas glib-genmarshal" \
+	    SRCFILE+="glib-gettextize glib-mkenums gobject-query gresource" \
+	    SRCFILE+="gsettings gtester gtester-report" \
+	    SRCFILE+="dbus-cleanup-sockets dbus-daemon dbus-launch dbus-monitor" \
+	    SRCFILE+="dbus-run-session dbus-send dbus-test-tool" \
+	    SRCFILE+="dbus-update-activation-environment dbus-uuidgen" \
+	    SRCFILE+="bccmd bluemoon bluetoothctl btmon ciptool hciattach" \
+	    SRCFILE+="hciconfig hcidump hcitool hex2hcd l2ping l2test mpris-proxy" \
+	    SRCFILE+="rctest rfcomm sdptool" \
 	    SRCDIR=$(DESTDIR)/bin \
 	    DESTDIR=$(userland_DIR)/bin dist-cp
-	# bzip expat libffi libical ncurses
+	# libz expat libffi libical ncurses readline glib dbus bluez
 	$(MAKE) SRCFILE="libz.so libz.so.* libexpat.so libexpat.so.*" \
-	    SRCFILE+="libffi.so libffi.so.*" \
-	    SRCFILE+="libical.so libical.so.* libicalss.so libicalss.so.* libicalvcal.so libicalvcal.so.*" \
+	    SRCFILE+="libffi.so libffi.so.* libical.so libical.so.*" \
+	    SRCFILE+="libicalss.so libicalss.so.* libicalvcal.so libicalvcal.so.*" \
 	    SRCFILE+="libical_cxx.so libical_cxx.so.* libicalss_cxx.so libicalss_cxx.so.*" \
-	    SRCFILE+="" \
+	    SRCFILE+="libform.so libform.so.* libmenu.so libmenu.so.*" \
+	    SRCFILE+="libncurses.so libncurses.so.* libncurses++.so libncurses++.so.*" \
+	    SRCFILE+="libpanel.so libpanel.so.* terminfo" \
+	    SRCFILE+="libreadline.so libreadline.so.*" \
+	    SRCFILE+="libgio-2.0.so libgio-2.0.so.* libglib-2.0.so libglib-2.0.so.*" \
+	    SRCFILE+="libgmodule-2.0.so libgmodule-2.0.so.* libgobject-2.0.so libgobject-2.0.so.*" \
+	    SRCFILE+="libgthread-2.0.so libgthread-2.0.so.*" \
+	    SRCFILE+="libdbus-1.so libdbus-1.so.*" \
 	    SRCDIR=$(DESTDIR)/lib \
 	    DESTDIR=$(userland_DIR)/lib dist-cp
-	    
-	$(MAKE) SRCFILE="bluetooth dbus-1" \
+	# dbus bluez
+	$(MAKE) SRCFILE="dbus-daemon-launch-helper bluetooth" \
+	    SRCDIR=$(DESTDIR)/libexec \
+	    DESTDIR=$(userland_DIR)/libexec dist-cp
+	# ncurses dbus
+	$(MAKE) SRCFILE="terminfo tabset dbus-1" \
+	    SRCDIR=$(DESTDIR)/share \
+	    DESTDIR=$(userland_DIR)/share dist-cp
+	# dbus bluez
+	$(MAKE) SRCFILE="dbus-1 bluetooth" \
 	    SRCDIR=$(DESTDIR)/etc \
 	    DESTDIR=$(userland_DIR)/etc dist-cp
-	$(MAKE) SRCFILE="libz.so libz.so.*" \
-	    SRCDIR=$(DESTDIR)/lib \
-	    DESTDIR=$(userland_DIR)/lib dist-cp
 
-#	for i in proc sys dev tmp var/run var/lib; do \
-#	  [ -d $(PROJDIR)/userland/$$i ] || $(MKDIR) $(PROJDIR)/userland/$$i; \
-#	done
-#	$(MAKE) zlib_install expat_install libical_install ncurses_install \
-#	    libffi_install
-#	$(MAKE) SRCFILE="libz.so libz.so.* libexpat.so libexpat.so.*" \
-#	    SRCFILE+="libical.so libical.so.* libical_cxx.so libical_cxx.so.*" \
-#	    SRCFILE+="libicalss.so libicalss.so.* libicalss_cxx.so libicalss_cxx.so.*" \
-#	    SRCFILE+="libicalvcal.so libicalvcal.so.*" \
-#	    SRCFILE+="libform.so libform.so.* libmenu.so libmenu.so.* libpanel.so libpanel.so.*" \
-#	    SRCFILE+="libncurses.so libncurses.so.* libncurses++.so libncurses++.so.*" \
-#	    SRCFILE+="libffi.so libffi.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-#	    dist-cp
-#	$(MAKE) TERMLIST="ansi, linux, vt100, vt102, vt220, xterm" \
-#	    DESTDIR=$(PROJDIR)/userland ncurses_install-terminfo
-#	$(MAKE) readline_install glib_install dbus_install
-#	$(MAKE) SRCFILE="libreadline.so libreadline.so.* libhistory.so libhistory.so.*" \
-#	    SRCFILE+="libgio-*.so libgio-*.so.* libglib-*.so libglib-*.so.*" \
-#	    SRCFILE+="libgmodule-*.so libgmodule-*.so.* libgobject-*.so libgobject-*.so.*" \
-#	    SRCFILE+="libgthread-*.so libgthread-*.so.*" \
-#	    SRCFILE+="libdbus-*.so libdbus-*.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-#	    dist-cp
-#	$(MAKE) SRCFILE="dbus-daemon dbus-send" \
-#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-#	    dist-cp
-#	$(MAKE) bluez_install
-#	$(MAKE) SRCFILE="libbluetooth.so libbluetooth.so.*" \
-#	    SRCDIR=$(DESTDIR)/lib DESTDIR=$(PROJDIR)/userland/lib \
-#	    dist-cp
-#	$(MAKE) SRCFILE="bluetoothd" \
-#	    SRCDIR=$(DESTDIR)/libexec/bluetooth DESTDIR=$(PROJDIR)/userland/bin \
-#	    dist-cp
-#	$(MAKE) SRCFILE="hciconfig hcitool bluetoothctl" \
-#	    SRCDIR=$(DESTDIR)/bin DESTDIR=$(PROJDIR)/userland/bin \
-#	    dist-cp
-
-.PHONY: userland
-
-dist: linux
-	$(RM) dist userland $(DESTDIR) 
-ifeq ("$(PLATFORM)","PI2")
-	$(MAKE) linux_uImage
-else
-	$(MAKE) initramfs uboot linux_uImage linux_dtbs
-endif
-	$(RM) $(DESTDIR)
-	$(MAKE) userland
+dist: linux_uImage # userland
 ifeq ("$(PLATFORM)","PI2")
 	$(MKDIR) $(PROJDIR)/dist/pi2
 	$(CP) $(linux_DIR)/arch/arm/boot/zImage \
@@ -1391,21 +1370,22 @@ ifeq ("$(PLATFORM)","PI2")
 	    $(PROJDIR)/prebuilt/boot-pi/* \
 	    $(PROJDIR)/dist/pi2/
 else ifeq ("$(PLATFORM)","XM")
-	$(MKDIR) $(PROJDIR)/dist/beagleboard
+	$(MAKE) uInitramfs uboot linux_dtbs
+	$(MKDIR) $(PROJDIR)/dist/xm
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
 	    $(PROJDIR)/dist/beagleboard
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/omap3-beagle-xm.dtb \
 	    $(PROJDIR)/dist/beagleboard/dtb
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage uInitramfs \
+	    $(PROJDIR)/dist
 else
-	$(MKDIR) $(PROJDIR)/dist/beaglebone
+	$(MAKE) uInitramfs uboot linux_dtbs
+	$(MKDIR) $(PROJDIR)/dist/bb
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
 	    $(PROJDIR)/dist/beaglebone
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
 	    $(PROJDIR)/dist/beaglebone/dtb
-endif
-ifeq ("$(PLATFORM)","PI2")
-else
-	$(CP) $(linux_DIR)/arch/arm/boot/uImage $(PROJDIR)/initramfs \
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage uInitramfs \
 	    $(PROJDIR)/dist
 endif
 
