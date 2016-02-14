@@ -53,5 +53,6 @@ cp_dist() {
   fi
 }
 
+platform=`cat Makefile | sed -n -e "s/^\\s*PLATFORM\\s*=\\s*\(.*\)\\s*$/\\1/p"`
 cp_dist "`pwd`/userland" "/media/$USER/ROOT"
-cp_dist "`pwd`/dist/pi2" "/media/$USER/bbq01"
+cp_dist "`pwd`/dist/$platform" "/media/$USER/bbq01"

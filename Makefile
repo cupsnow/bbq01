@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2
-PLATFORM = PI2
+PLATFORM = BB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -13,6 +13,8 @@ EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH:%=%/bin)
 
 ifeq ("$(PLATFORM)","PI2")
 PLATFORM_CFLAGS = -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
+else ifeq ("$(PLATFORM)","BB")
+PLATFORM_CFLAGS = -mcpu=cortex-a8 -mfpu=neon-vfpv4 -mfloat-abi=hard
 endif
 
 export PATH := $(subst $(SPACE),:,$(strip $(EXTRA_PATH)) $(PATH))
@@ -241,7 +243,7 @@ openssl_dir:
 	$(openssl_MAKE) clean
 
 openssl_clean openssl_distclean:
-	if [ -e $(openssl_DIR)/Makefile ]; then \
+	if [ -e $(openssl_DIR)/include/openssl ]; then \
 	  $(openssl_MAKE) clean; \
 	fi
 
@@ -287,6 +289,8 @@ bzip2%:
 	  $(MAKE) bzip2_dir; \
 	fi
 	$(bzip2_MAKE) $(patsubst _%,%,$(@:bzip2%=%))
+
+CLEAN += bzip2
 
 #------------------------------------
 #
@@ -413,6 +417,8 @@ iperf%:
 	fi
 	$(iperf_MAKE) $(patsubst _%,%,$(@:iperf%=%))
 
+CLEAN += iperf
+
 #------------------------------------
 # dependent: openssl
 #
@@ -485,6 +491,8 @@ socat%:
 	fi
 	$(socat_MAKE) $(patsubst _%,%,$(@:socat%=%))
 
+CLEAN += socat
+
 #------------------------------------
 #
 expat_DIR = $(PROJDIR)/package/expat
@@ -519,6 +527,8 @@ expat%:
 	  $(MAKE) expat_makefile; \
 	fi
 	$(expat_MAKE) $(patsubst _%,%,$(@:expat%=%))
+
+CLEAN += expat
 
 #------------------------------------
 #
@@ -555,6 +565,8 @@ libffi%:
 	fi
 	$(libffi_MAKE) $(patsubst _%,%,$(@:libffi%=%))
 
+CLEAN += libffi
+
 #------------------------------------
 #
 libical_DIR = $(PROJDIR)/package/libical
@@ -589,6 +601,8 @@ libical%:
 	  $(MAKE) libical_makefile; \
 	fi
 	$(libical_MAKE) $(patsubst _%,%,$(@:libical%=%))
+
+CLEAN += libical
 
 #------------------------------------
 #
@@ -625,6 +639,8 @@ ncurses%:
 	  $(MAKE) ncurses_makefile; \
 	fi
 	$(ncurses_MAKE) $(patsubst _%,%,$(@:ncurses%=%))
+
+CLEAN += ncurses
 
 #------------------------------------
 # dependency: ncurses
@@ -668,6 +684,8 @@ readline%:
 	  done; \
 	fi
 
+CLEAN += readline
+
 #------------------------------------
 # dependent: libffi zlib
 #
@@ -708,6 +726,8 @@ glib%:
 	fi
 	$(glib_MAKE) $(patsubst _%,%,$(@:glib%=%))
 
+CLEAN += glib
+
 #------------------------------------
 # dependent: expat
 #
@@ -745,23 +765,13 @@ dbus%:
 	fi
 	$(dbus_MAKE) $(patsubst _%,%,$(@:dbus%=%))
 
+CLEAN += dbus
+
 #------------------------------------
 # dependent: glib readline, libical, dbus
 #
 bluez_DIR = $(PROJDIR)/package/bluez
 bluez_MAKE = $(MAKE) DESTDIR=$(DESTDIR) V=1 -C $(bluez_DIR)
-#bluez_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-#    --with-pic $(addprefix --enable-,static library threads pie) \
-#    $(addprefix --disable-,udev cups systemd) \
-#    --with-dbusconfdir=/etc \
-#    --with-dbussystembusdir=/share/dbus-1/system-services \
-#    --with-dbussessionbusdir=/share/dbus-1/services \
-#    DBUS_CFLAGS="-I$(DESTDIR)/include/dbus-1.0 -I$(DESTDIR)/lib/dbus-1.0/include" \
-#    DBUS_LIBS="-L$(DESTDIR)/lib -ldbus-1" \
-#    ICAL_CFLAGS="-I$(DESTDIR)/include" \
-#    ICAL_LIBS="-L$(DESTDIR)/lib -lical -licalss -licalvcal -lpthread" \
-#    CFLAGS="$(PLATFORM_CFLAGS)" CPPFLAGS="-I$(DESTDIR)/include" \
-#    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lncurses"
 bluez_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     --with-pic $(addprefix --enable-,static threads pie) \
     $(addprefix --disable-,test udev cups systemd) \
@@ -807,6 +817,8 @@ bluez%:
 	  [ -d $(DESTDIR)/etc/bluetooth ] || $(MKDIR) $(DESTDIR)/etc/bluetooth; \
 	  $(CP) $(bluez_DIR)/src/main.conf $(DESTDIR)/etc/bluetooth/; \
 	fi
+
+CLEAN += bluez
 
 #------------------------------------
 #
@@ -1008,47 +1020,6 @@ CLEAN += ffmpeg
 
 #------------------------------------
 #
-wpa-supplicant_DIR = $(PROJDIR)/package/wpa_supplicant
-wpa-supplicant_MAKE = $(MAKE) DESTDIR=$(DESTDIR) LIBDIR=/lib/ BINDIR=/usr/sbin/ \
-    EXTRA_CFLAGS+="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
-    LDFLAGS+="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
-    CONFIG_LIBNL32=1 LIBNL_INC="$(DESTDIR)/include/libnl3" \
-    CC=$(CC) -C $(wpa-supplicant_DIR)/wpa_supplicant
-
-wpa-supplicant: wpa-supplicant_;
-
-wpa-supplicant_dir:
-	wget -O $(dir $(wpa-supplicant_DIR))/wpa_supplicant-2.4.tar.gz \
-	    http://w1.fi/releases/wpa_supplicant-2.4.tar.gz
-	cd $(dir $(wpa-supplicant_DIR)) && \
-	  tar -zxvf wpa_supplicant-2.4.tar.gz && \
-	  ln -sf wpa_supplicant-2.4 $(notdir $(wpa-supplicant_DIR))
-
-wpa-supplicant_clean:
-	$(wpa-supplicant_MAKE) clean
-
-wpa-supplicant_distclean:
-	$(wpa-supplicant_MAKE) clean
-	$(RM) $(wpa-supplicant_DIR)/wpa_supplicant/.config
-
-wpa-supplicant_makefile:
-	$(CP) $(wpa-supplicant_DIR)/wpa_supplicant/defconfig \
-	    $(wpa-supplicant_DIR)/wpa_supplicant/.config
-
-wpa-supplicant%:
-	if [ ! -d $(wpa-supplicant_DIR) ]; then \
-	  $(MAKE) wpa-supplicant_dir; \
-	fi
-	if [ ! -e $(wpa-supplicant_DIR)/wpa_supplicant/.config ]; then \
-	  $(MAKE) wpa-supplicant_makefile; \
-	fi
-	$(wpa-supplicant_MAKE) \
-	    $(patsubst _%,%,$(@:wpa-supplicant%=%))
-
-CLEAN += wpa-supplicant
-
-#------------------------------------
-#
 webme_DIR = $(PROJDIR)/package/webme
 webme_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(webme_DIR)
 webme_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
@@ -1247,18 +1218,18 @@ prebuilt:
 
 .PHONY: prebuilt
 
-initramfs_DIR ?= $(PROJDIR)/initramfs
-uInitramfs: tool linux_headers_install
-	$(MAKE) PREBUILT=$(PROJDIR)/prebuilt/initramfs/* \
-	    DESTDIR=$(initramfs_DIR) \
-	    devlist so1 prebuilt busybox_install
+initramfs_DIR ?= $(PROJDIR)/initramfsroot
+initramfs: tool linux_headers_install
+	$(MAKE) DESTDIR=$(initramfs_DIR) devlist so1 busybox_install
+	$(RSYNC) $(PROJDIR)/prebuilt/common/* $(initramfs_DIR)
+	$(RSYNC) $(PROJDIR)/prebuilt/initramfs/* $(initramfs_DIR)
 	cd $(linux_DIR) && bash scripts/gen_initramfs_list.sh \
 	    -o $(PROJDIR)/initramfs.cpio.gz \
 	    $(PROJDIR)/devlist $(initramfs_DIR)
 	mkimage -n 'bbq01 initramfs' -A arm -O linux -T ramdisk -C gzip \
 	    -d $(PROJDIR)/initramfs.cpio.gz $@
 
-.PHONY: uInitramfs
+.PHONY: initramfs
 
 userland_DIR ?= $(PROJDIR)/userland
 userland0: tool linux_headers_install
@@ -1356,11 +1327,12 @@ userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
 	    SRCDIR=$(DESTDIR)/etc \
 	    DESTDIR=$(userland_DIR)/etc dist-cp
 
+distdir ?= $(PROJDIR)/dist/$(PLATFORM)
 dist: linux_uImage # userland
+	$(MKDIR) $(distdir)
 ifeq ("$(PLATFORM)","PI2")
-	$(MKDIR) $(PROJDIR)/dist/pi2
 	$(CP) $(linux_DIR)/arch/arm/boot/zImage \
-	    $(PROJDIR)/dist/pi2/kernel.img
+	    $(distdir)/kernel.img
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2709-rpi-2-b.dtb \
 	    $(firmware-pi_DIR)/boot/bootcode.bin \
 	    $(firmware-pi_DIR)/boot/start.elf \
@@ -1368,25 +1340,27 @@ ifeq ("$(PLATFORM)","PI2")
 	    $(firmware-pi_DIR)/boot/start_x.elf \
 	    $(firmware-pi_DIR)/boot/fixup_x.dat \
 	    $(PROJDIR)/prebuilt/boot-pi/* \
-	    $(PROJDIR)/dist/pi2/
+	    $(distdir)/
 else ifeq ("$(PLATFORM)","XM")
-	$(MAKE) uInitramfs uboot linux_dtbs
-	$(MKDIR) $(PROJDIR)/dist/xm
+	$(MAKE) initramfs uboot linux_dtbs
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
-	    $(PROJDIR)/dist/beagleboard
+	    $(distdir)/
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/omap3-beagle-xm.dtb \
-	    $(PROJDIR)/dist/beagleboard/dtb
-	$(CP) $(linux_DIR)/arch/arm/boot/uImage uInitramfs \
-	    $(PROJDIR)/dist
+	    $(distdir)/dtb
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage \
+	    $(distdir)/
+	$(CP) initramfs \
+	    $(distdir)/initramfs
 else
-	$(MAKE) uInitramfs uboot linux_dtbs
-	$(MKDIR) $(PROJDIR)/dist/bb
+	$(MAKE) initramfs uboot linux_dtbs
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
-	    $(PROJDIR)/dist/beaglebone
+	    $(distdir)/
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-bone.dtb \
-	    $(PROJDIR)/dist/beaglebone/dtb
-	$(CP) $(linux_DIR)/arch/arm/boot/uImage uInitramfs \
-	    $(PROJDIR)/dist
+	    $(distdir)/dtb
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage \
+	    $(distdir)/
+	$(CP) initramfs \
+	    $(distdir)/initramfs
 endif
 
 .PHONY: dist
@@ -1408,8 +1382,8 @@ clean:
 
 distclean:
 	$(MAKE) $(addsuffix _$@,$(CLEAN))
-	$(RM) dist obj userland devlist initramfs initramfs.cpio.gz \
-	  terminfo.tmp
+	$(RM) $(DESTDIR) $(initramfs_DIR) initramfs initramfs.cpio.gz \
+	  $(userland_DIR)
 
 #------------------------------------
 #

@@ -6,7 +6,7 @@ gotonewroot() {
   
   echo -n "Mount new root ..."
   [ ! -d $ROOTDIR ] && mkdir -p $ROOTDIR
-  mount $ROOTDEV $ROOTDIR || return
+  mount -t ext4 -o ro,noload $ROOTDEV $ROOTDIR || return
   check_status
   
   for i in sys proc dev; do
@@ -20,7 +20,7 @@ gotonewroot() {
 
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
-echo -n "Start in initramfs"
+echo "Start in initramfs"
 
 . /etc/rc.d/init.d/sysinit
 
