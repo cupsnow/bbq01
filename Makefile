@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2
-PLATFORM = BB
+PLATFORM = PI2
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -80,12 +80,7 @@ CLEAN += uboot
 
 #------------------------------------
 #
-ifeq ("$(PLATFORM)","PI2")
-linux_DIR = $(PROJDIR)/package/linux-pi
-else
-linux_DIR = $(PROJDIR)/package/linux-3.16.2
-endif
-
+linux_DIR = $(PROJDIR)/package/linux
 linux_MAKEPARAM = CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
     INSTALL_HDR_PATH=$(DESTDIR)/usr INSTALL_MOD_PATH=$(DESTDIR) \
     CONFIG_INITRAMFS_SOURCE=$(CONFIG_INITRAMFS_SOURCE) \
@@ -102,12 +97,17 @@ linux: linux_;
 
 linux_dir:
 ifeq ("$(PLATFORM)","PI2")
-	if [ -d $(linux_DIR) ] ; then \
-	  cd $(linux_DIR); git pull --depth=1; \
+	if [ -d $(linux_DIR)-pi2 ]; then \
+	  cd $(linux_DIR)-pi2; git pull --depth=1; \
 	else \
-	  git clone --depth=1 https://github.com/raspberrypi/linux $(linux_DIR); \
+	  git clone --depth=1 https://github.com/raspberrypi/linux $(linux_DIR)-pi2 && \
+	  ln -sf $(notdir $(linux_DIR)-pi2) $(linux_DIR); \
 	fi
 else
+	cd $(dir $(linux_DIR)) && \
+	  wget https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.5-rc4.tar.xz && \
+	  tar -Jxvf linux-4.5-rc4.tar.xz && \
+	  ln -sf linux-4.5-rc4 $(notdir $(linux_DIR))
 endif
 
 linux_config:
@@ -1179,6 +1179,42 @@ python%: $(python-host)
 	    $(patsubst _%,%,$(@:python%=%))
 
 CLEAN += python
+
+#------------------------------------
+#
+avrdude_DIR = $(PROJDIR)/package/avrdude
+avrdude_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(avrdude_DIR)
+avrdude_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --enable-linuxgpio \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+avrdude: avrdude_;
+
+avrdude_dir:
+	cd $(dir $(avrdude_DIR)) && \
+	  wget http://download.savannah.gnu.org/releases/avrdude/avrdude-6.3.tar.gz && \
+	  tar -zxvf avrdude-6.3.tar.gz && \
+	  ln -sf avrdude-6.3 $(notdir $(avrdude_DIR))
+
+avrdude_clean avrdude_distclean:
+	if [ -e $(avrdude_DIR)/Makefile ]; then \
+	  $(avrdude_MAKE) $(patsubst _%,%,$(@:avrdude%=%)); \
+	fi
+
+avrdude_makefile:
+	cd $(avrdude_DIR) && ./configure $(avrdude_CFGPARAM)
+
+avrdude%:
+	if [ ! -d $(avrdude_DIR) ]; then \
+	  $(MAKE) avrdude_dir; \
+	fi
+	if [ ! -e $(avrdude_DIR)/Makefile ]; then \
+	  $(MAKE) avrdude_makefile; \
+	fi
+	$(avrdude_MAKE) $(patsubst _%,%,$(@:avrdude%=%))
+
+CLEAN += avrdude
 
 #------------------------------------
 # git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi
