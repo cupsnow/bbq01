@@ -10,7 +10,10 @@
 #include "am33xx.dtsi"
 #include "am335x-bone-common.dtsi"
 
- / {
+/ {
+	model = "TI AM335x BeagleBone";
+	compatible = "ti,am335x-bone", "ti,am33xx";
+
     panel {
 		compatible = "ti,tilcdc,panel";
 		pinctrl-names = "default";
@@ -48,7 +51,17 @@
 		};
     };
 };
-        
+
+&ldo3_reg {
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <3300000>;
+	regulator-always-on;
+};
+
+&mmc1 {
+	vmmc-supply = <&ldo3_reg>;
+};
+
 &am33xx_pinmux {
 	lcd_pins_default: lcd_pins_default {
 		pinctrl-single,pins = <
@@ -84,16 +97,6 @@
 
 &lcdc {
 	status = "okay";
-};
-
-&ldo3_reg {
-	regulator-min-microvolt = <1800000>;
-	regulator-max-microvolt = <3300000>;
-	regulator-always-on;
-};
-
-&mmc1 {
-	vmmc-supply = <&ldo3_reg>;
 };
 
 &sham {

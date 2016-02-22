@@ -3,8 +3,8 @@
 PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
-# BB, XM, QEMU, PI2
-PLATFORM = PI2
+# BB, XM, QEMU, PI2, BBB
+PLATFORM = BBB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -13,6 +13,8 @@ EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH:%=%/bin)
 
 ifeq ("$(PLATFORM)","PI2")
 PLATFORM_CFLAGS = -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
+else ifeq ("$(PLATFORM)","BBB")
+PLATFORM_CFLAGS = -mcpu=cortex-a8 -mfpu=neon-vfpv4 -mfloat-abi=hard
 else ifeq ("$(PLATFORM)","BB")
 PLATFORM_CFLAGS = -mcpu=cortex-a8 -mfpu=neon-vfpv4 -mfloat-abi=hard
 endif
@@ -456,6 +458,44 @@ curl%:
 	$(curl_MAKE) $(patsubst _%,%,$(@:curl%=%))
 
 CLEAN += curl
+
+
+#------------------------------------
+# dependent: zlib, openssl
+#
+openssh_DIR = $(PROJDIR)/package/openssh
+openssh_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(openssh_DIR)
+openssh_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --disable-strip --disable-etc-default-login \
+    CPPFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+openssh: openssh_;
+
+openssh_dir:
+	git clone git://anongit.mindrot.org/openssh.git $(openssh_DIR)
+
+openssh_clean openssh_distclean:
+	if [ -f $(openssh_DIR)/Makefile ]; then \
+	  $(openssh_MAKE) $(patsubst _%,%,$(@:openssh%=%)); \
+	fi
+
+openssh_makefile:
+	if [ ! -e $(openssh_DIR)/configure ]; then \
+	  cd $(openssh_DIR) && autoreconf -fiv; \
+	fi
+	cd $(openssh_DIR) && $(openssh_CFGENV) ./configure $(openssh_CFGPARAM)
+
+openssh%:
+	if [ ! -d $(openssh_DIR) ]; then \
+	  $(MAKE) openssh_dir; \
+	fi
+	if [ ! -e $(openssh_DIR)/Makefile ]; then \
+	  $(MAKE) openssh_makefile; \
+	fi
+	$(openssh_MAKE) $(patsubst _%,%,$(@:openssh%=%))
+
+CLEAN += openssh
 
 #------------------------------------
 # dependent: openssl
@@ -1248,6 +1288,12 @@ so2:
 	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
 	    DESTDIR=$(DESTDIR)/lib dist-cp
 
+so3:
+	$(MAKE) SRCFILE="libutil.so.* libutil-*.so libcrypt.so.* libcrypt-*.so" \
+	    SRCFILE+="libresolv.so.* libresolv-*.so" \
+	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
+	    DESTDIR=$(DESTDIR)/lib dist-cp
+
 prebuilt:
 	$(MKDIR) $(DESTDIR)
 	$(RSYNC) $(PROJDIR)/prebuilt/common/* $(PREBUILT) $(DESTDIR)
@@ -1281,24 +1327,29 @@ ifeq ("$(PLATFORM)","PI2")
 endif
 
 userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf)
-	for i in proc sys dev tmp var/run; do \
+	for i in proc sys dev tmp var/run var/empty; do \
 	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
 	$(MAKE) $(addsuffix _install,openssl)
-	$(MAKE) $(addsuffix _install,curl socat)
+	$(MAKE) $(addsuffix _install,curl socat) openssh_install-nokeys
 	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
-	    DESTDIR=$(userland_DIR) so1 so2 prebuilt \
+	    DESTDIR=$(userland_DIR) so1 so2 so3 prebuilt \
 	    $(addsuffix _install,linux_modules busybox)
 ifeq ("$(PLATFORM)","PI2")
 	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-pi/*" \
 	    DESTDIR=$(userland_DIR) prebuilt
 endif
-	# bzip iperf openssl curl
+	# bzip iperf openssl curl openssh
 	$(MAKE) SRCFILE="bunzip2 bzcat bzcmp bzdiff bzegrep bzfgrep bzgrep" \
 	    SRCFILE+="bzip2 bzip2recover bzless bzmore iperf3 openssl" \
+	    SRCFILE+="scp sftp ssh ssh-add ssh-agent ssh-keygen ssh-keyscan" \
 	    SRCFILE+="curl" \
 	    SRCDIR=$(DESTDIR)/bin \
 	    DESTDIR=$(userland_DIR)/bin dist-cp
+	# openssh
+	$(MAKE) SRCFILE="sshd" \
+	    SRCDIR=$(DESTDIR)/sbin \
+	    DESTDIR=$(userland_DIR)/sbin dist-cp
 	# libz json-c libmoss iperf openssl curl
 	$(MAKE) SRCFILE="libz.so libz.so.* libjson-c.so libjson-c.so.*" \
 	    SRCFILE+="libmoss.so libmoss.so.* libiperf.so libiperf.so.*" \
@@ -1310,6 +1361,10 @@ endif
 	$(MAKE) SRCFILE="openssl" \
 	    SRCDIR=$(DESTDIR)/usr \
 	    DESTDIR=$(userland_DIR)/usr dist-cp
+	# openssh
+	$(MAKE) SRCFILE="moduli ssh_config sshd_config" \
+	    SRCDIR=$(DESTDIR)/etc \
+	    DESTDIR=$(userland_DIR)/etc dist-cp
 
 .PHONY: userland
 
@@ -1387,6 +1442,16 @@ else ifeq ("$(PLATFORM)","XM")
 	    $(distdir)/
 	$(CP) initramfs \
 	    $(distdir)/initramfs
+else ifeq ("$(PLATFORM)","BBB")
+	$(MAKE) initramfs uboot linux_dtbs
+	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
+	    $(distdir)/
+	$(CP) $(linux_DIR)/arch/arm/boot/dts/am335x-boneblack.dtb \
+	    $(distdir)/dtb
+	$(CP) $(linux_DIR)/arch/arm/boot/uImage \
+	    $(distdir)/
+	$(CP) initramfs \
+	    $(distdir)/initramfs
 else
 	$(MAKE) initramfs uboot linux_dtbs
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
@@ -1419,7 +1484,7 @@ clean:
 distclean:
 	$(MAKE) $(addsuffix _$@,$(CLEAN))
 	$(RM) $(DESTDIR) $(initramfs_DIR) initramfs initramfs.cpio.gz \
-	  $(userland_DIR)
+	  $(userland_DIR) dist
 
 #------------------------------------
 #
