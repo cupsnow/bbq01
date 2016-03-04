@@ -57,23 +57,34 @@ tool: ;
 
 #------------------------------------
 #
-uboot_DIR = $(PROJDIR)/package/u-boot-2014.07
+uboot_DIR = $(PROJDIR)/package/u-boot
 uboot_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
 
 uboot: uboot_;
 
+uboot_dir:
+	cd $(uboot_DIR) && \
+	  wget ftp://ftp.denx.de/pub/u-boot/u-boot-2016.03-rc3.tar.bz2 && \
+	  tar -jxvf u-boot-2016.03-rc3.tar.bz2 && \
+	  ln -sf u-boot-2016.03-rc3 $(uboot_DIR)
+
 uboot_config:
 ifeq ("$(PLATFORM)","XM")
-	$(uboot_MAKE) omap3_beagle_config
+	$(uboot_MAKE) omap3_beagle_defconfig
+else ifeq ("$(PLATFORM)","BBB")
+	$(uboot_MAKE) am335x_boneblack_defconfig
 else
-	$(uboot_MAKE) am335x_evm_config
+	$(uboot_MAKE) am335x_evm_defconfig
 endif
 
 uboot_clean uboot_distclean:
 	$(uboot_MAKE) $(patsubst _%,%,$(@:uboot%=%))
 
 uboot%:
-	if [ ! -f $(uboot_DIR)/include/config.mk ]; then \
+	if [ ! -d $(uboot_DIR) ]; then \
+	  $(MAKE) uboot_dir; \
+	fi
+	if [ ! -f $(uboot_DIR)/.config ]; then \
 	  $(MAKE) uboot_config; \
 	fi
 	$(uboot_MAKE) $(patsubst _%,%,$(@:uboot%=%))
@@ -115,6 +126,8 @@ endif
 linux_config:
 ifeq ("$(PLATFORM)","PI2")
 	$(linux_MAKE) bcm2709_defconfig
+else ifeq ("$(PLATFORM)","BBB")
+	$(linux_MAKE) multi_v7_defconfig
 else
 	$(linux_MAKE) bbq01_defconfig #multi_v7_defconfig
 endif
@@ -681,6 +694,44 @@ ncurses%:
 	$(ncurses_MAKE) $(patsubst _%,%,$(@:ncurses%=%))
 
 CLEAN += ncurses
+
+#------------------------------------
+# dependent: libffi
+#
+p11-kit_DIR = $(PROJDIR)/package/p11-kit
+p11-kit_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(p11-kit_DIR)
+p11-kit_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    LIBFFI_CFLAGS="-I$(dir $(wildcard $(DESTDIR)/lib/libffi-*/include/ffi.h))" \
+    LIBFFI_LIBS="-L$(DESTDIR)/lib -lffi" \
+    CPPFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+p11-kit: p11-kit_;
+
+p11-kit_dir:
+	git clone git://anongit.freedesktop.org/p11-glue/p11-kit $(p11-kit_DIR)
+
+p11-kit_clean p11-kit_distclean:
+	if [ -f $(p11-kit_DIR)/Makefile ]; then \
+	  $(p11-kit_MAKE) $(patsubst _%,%,$(@:p11-kit%=%)); \
+	fi
+
+p11-kit_makefile:
+	if [ ! -e $(p11-kit_DIR)/configure ]; then \
+	  cd $(p11-kit_DIR) && ./autogen.sh; \
+	fi
+	cd $(p11-kit_DIR) && $(p11-kit_CFGENV) ./configure $(p11-kit_CFGPARAM)
+
+p11-kit%:
+	if [ ! -d $(p11-kit_DIR) ]; then \
+	  $(MAKE) p11-kit_dir; \
+	fi
+	if [ ! -e $(p11-kit_DIR)/Makefile ]; then \
+	  $(MAKE) p11-kit_makefile; \
+	fi
+	$(p11-kit_MAKE) $(patsubst _%,%,$(@:p11-kit%=%))
+
+CLEAN += p11-kit
 
 #------------------------------------
 # dependency: ncurses
@@ -1452,6 +1503,9 @@ else ifeq ("$(PLATFORM)","BBB")
 	    $(distdir)/
 	$(CP) initramfs \
 	    $(distdir)/initramfs
+	mkimage -C none -A arm -T script \
+	    -d $(PROJDIR)/package/ubootscr-bbb/boot.sh \
+	    $(distdir)/boot.scr
 else
 	$(MAKE) initramfs uboot linux_dtbs
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
