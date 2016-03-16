@@ -56,4 +56,4 @@ cp_dist() {
 PLATFORM=`cat Makefile | sed -n -e "s/^\\s*PLATFORM\\s*=\\s*\(.*\)\\s*$/\\1/p"`
 log_debug "PLATFORM: ${PLATFORM}"
 cp_dist "`pwd`/userland" "/media/$USER/bbq01root"
-cp_dist "`pwd`/dist/$platform/*" "/media/$USER/BBQ01BOOT"
+cp_dist "`pwd`/dist/$PLATFORM" "/media/$USER/BBQ01BOOT"

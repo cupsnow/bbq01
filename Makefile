@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = BBB
+PLATFORM = BB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -63,7 +63,7 @@ uboot_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
 uboot: uboot_;
 
 uboot_dir:
-	cd $(uboot_DIR) && \
+	cd $(dir $(uboot_DIR)) && \
 	  wget ftp://ftp.denx.de/pub/u-boot/u-boot-2016.03-rc3.tar.bz2 && \
 	  tar -jxvf u-boot-2016.03-rc3.tar.bz2 && \
 	  ln -sf u-boot-2016.03-rc3 $(uboot_DIR)
@@ -118,15 +118,17 @@ ifeq ("$(PLATFORM)","PI2")
 	fi
 else
 	cd $(dir $(linux_DIR)) && \
-	  wget https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.5-rc4.tar.xz && \
-	  tar -Jxvf linux-4.5-rc4.tar.xz && \
-	  ln -sf linux-4.5-rc4 $(notdir $(linux_DIR))
+	  wget https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.5-rc7.tar.xz && \
+	  tar -Jxvf linux-4.5-rc7.tar.xz && \
+	  ln -sf linux-4.5-rc7 $(notdir $(linux_DIR))
 endif
 
 linux_config:
 ifeq ("$(PLATFORM)","PI2")
 	$(linux_MAKE) bcm2709_defconfig
 else ifeq ("$(PLATFORM)","BBB")
+	$(linux_MAKE) multi_v7_defconfig
+else ifeq ("$(PLATFORM)","BB")
 	$(linux_MAKE) multi_v7_defconfig
 else
 	$(linux_MAKE) bbq01_defconfig #multi_v7_defconfig
@@ -398,6 +400,47 @@ libmoss%:
 	$(libmoss_MAKE) $(patsubst _%,%,$(@:libmoss%=%))
 
 CLEAN += libmoss
+
+#------------------------------------
+#
+findme_DIR = $(PROJDIR)/package/findme
+findme_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(findme_DIR)
+findme_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    CPPFLAGS="-I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+findme: findme_;
+
+findme_dir:
+	git clone git@bitbucket.org:joelai/findme.git $(findme_DIR)
+
+findme_clean findme_distclean:
+	if [ -e $(findme_DIR)/Makefile ]; then \
+	  $(findme_MAKE) $(patsubst _%,%,$(@:findme%=%)); \
+	fi
+
+findme_configure:
+	cd $(findme_DIR) && \
+	  ./autogen.sh
+
+findme_makefile:
+	cd $(findme_DIR) && \
+	  ./configure $(findme_CFGPARAM)
+
+findme%:
+	if [ ! -d $(findme_DIR) ]; then \
+	  $(MAKE) findme_dir; \
+	fi
+	if [ ! -x $(findme_DIR)/configure ]; then \
+	  $(MAKE) findme_configure; \
+	fi
+	if [ ! -e $(findme_DIR)/Makefile ]; then \
+	  $(MAKE) findme_makefile; \
+	fi
+	$(findme_MAKE) $(patsubst _%,%,$(@:findme%=%))
+
+CLEAN += findme
 
 #------------------------------------
 #
@@ -1382,19 +1425,22 @@ userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-
 	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
 	$(MAKE) $(addsuffix _install,openssl)
-	$(MAKE) $(addsuffix _install,curl socat) openssh_install-nokeys
+	$(MAKE) $(addsuffix _install,curl socat findme) openssh_install-nokeys
 	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
 	    DESTDIR=$(userland_DIR) so1 so2 so3 prebuilt \
 	    $(addsuffix _install,linux_modules busybox)
 ifeq ("$(PLATFORM)","PI2")
 	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-pi/*" \
 	    DESTDIR=$(userland_DIR) prebuilt
+else
+	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-bb/*" \
+	    DESTDIR=$(userland_DIR) prebuilt
 endif
-	# bzip iperf openssl curl openssh
+	# bzip iperf openssl openssh curl socat findme
 	$(MAKE) SRCFILE="bunzip2 bzcat bzcmp bzdiff bzegrep bzfgrep bzgrep" \
 	    SRCFILE+="bzip2 bzip2recover bzless bzmore iperf3 openssl" \
 	    SRCFILE+="scp sftp ssh ssh-add ssh-agent ssh-keygen ssh-keyscan" \
-	    SRCFILE+="curl" \
+	    SRCFILE+="curl socat findme" \
 	    SRCDIR=$(DESTDIR)/bin \
 	    DESTDIR=$(userland_DIR)/bin dist-cp
 	# openssh
@@ -1516,6 +1562,9 @@ else
 	    $(distdir)/
 	$(CP) initramfs \
 	    $(distdir)/initramfs
+	mkimage -C none -A arm -T script \
+	    -d $(PROJDIR)/package/ubootscr-bbb/boot.sh \
+	    $(distdir)/boot.scr
 endif
 
 .PHONY: dist
