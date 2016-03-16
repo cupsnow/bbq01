@@ -7,6 +7,10 @@
 
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
+echo -n "Remount root to writable ..."
+  mount -o remount,rw /
+check_status
+
 # should be done in /init or initramfs
 [ -f /etc/rc.d/init.d/sysinit ] && . /etc/rc.d/init.d/sysinit
 
