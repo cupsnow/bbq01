@@ -909,6 +909,7 @@ bluez_MAKE = $(MAKE) DESTDIR=$(DESTDIR) V=1 -C $(bluez_DIR)
 bluez_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     --with-pic $(addprefix --enable-,static threads pie) \
     $(addprefix --disable-,test udev cups systemd) \
+    --enable-library \
     --with-dbusconfdir=/etc \
     --with-dbussystembusdir=/share/dbus-1/system-services \
     --with-dbussessionbusdir=/share/dbus-1/services \
@@ -1499,7 +1500,7 @@ userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
 	    SRCFILE+="libgio-2.0.so libgio-2.0.so.* libglib-2.0.so libglib-2.0.so.*" \
 	    SRCFILE+="libgmodule-2.0.so libgmodule-2.0.so.* libgobject-2.0.so libgobject-2.0.so.*" \
 	    SRCFILE+="libgthread-2.0.so libgthread-2.0.so.*" \
-	    SRCFILE+="libdbus-1.so libdbus-1.so.*" \
+	    SRCFILE+="libdbus-1.so libdbus-1.so.* libbluetooth.so libbluetooth.so.*" \
 	    SRCDIR=$(DESTDIR)/lib \
 	    DESTDIR=$(userland_DIR)/lib dist-cp
 	# dbus bluez
