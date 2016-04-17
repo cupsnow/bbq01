@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = BB
+PLATFORM = BBB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -454,9 +454,9 @@ iperf: iperf_;
 
 iperf_dir:
 	cd $(dir $(iperf_DIR)) && \
-	  wget https://iperf.fr/download/iperf_3.1/iperf-3.1-source.tar.gz && \
-	  tar -zxvf iperf-3.1-source.tar.gz && \
-	  ln -sf iperf-3.1 $(iperf_DIR)
+	  wget https://iperf.fr/download/source/iperf-3.1.2-source.tar.gz && \
+	  tar -zxvf iperf-3.1.2-source.tar.gz && \
+	  ln -sf iperf-3.1.2 $(iperf_DIR)
 
 iperf_clean iperf_distclean:
 	if [ -f $(iperf_DIR)/Makefile ]; then \

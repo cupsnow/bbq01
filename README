@@ -1,27 +1,21 @@
 ### System overview
-* BeagleBone Rev A6
+* BeagleBone Black Rev C
 
 ### Setup environment
-* For toolchain run on **Ubuntu 14.04 64bits**
-
-  	  	$ sudo dpkg --add-architecture i386
-  	  	$ sudo apt-get install gcc-multilib g++-multilib autoconf automake libtool libncurses5-dev
-
-* Extra usful package
-
-  	  	$ sudo apt-get install openjdk-7-jdk meld
-
-* Extract toolchain under **tool/arm-2014.05-29-arm-none-linux-gnueabi-i686-pc-linux-gnu.tar.bz2**
+* Toolchain download from http://www.linaro.org/
 
 ### Build
-* build all
+* Create the link tool/toolchain to the toolchain
+* Modify Makefile, provided value for PLATFORM =
+* Run following command to build all
 
-        $ make dist
+        $ make dist; make userland
 
 ### Install
-* SD card needs 2 partitions, **BOOT** and **ROOTFS**
-* copy **dist/boot/\*** to **BOOT** partition
-* copy **dist/userland/\*** **ROOTFS** partition
+* SD card create 2 partitions, **bbq01root** and **BBQ01BOOT**
+* Run following command to copy all into SD card
+
+        $ ././cp_dist.sh
 
 ### note
 * Check dependent shared library for an **OBJ**
