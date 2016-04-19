@@ -118,9 +118,9 @@ ifeq ("$(PLATFORM)","PI2")
 	fi
 else
 	cd $(dir $(linux_DIR)) && \
-	  wget https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.5-rc7.tar.xz && \
-	  tar -Jxvf linux-4.5-rc7.tar.xz && \
-	  ln -sf linux-4.5-rc7 $(notdir $(linux_DIR))
+	  wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.5.1.tar.xz && \
+	  tar -Jxvf linux-4.5.1.tar.xz && \
+	  ln -sf linux-4.5.1 $(notdir $(linux_DIR))
 endif
 
 linux_config:
