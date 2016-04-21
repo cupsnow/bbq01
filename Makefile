@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = BBB
+PLATFORM = BB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -701,6 +701,7 @@ libical%:
 CLEAN += libical
 
 #------------------------------------
+# dependent: failed on gcc 5.0
 #
 ncurses_DIR = $(PROJDIR)/package/ncurses
 ncurses_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(ncurses_DIR)
@@ -954,6 +955,48 @@ bluez%:
 	fi
 
 CLEAN += bluez
+
+#------------------------------------
+# patch configure.ac
+#   marked AC_TRY_RUN
+# dependent: ncurses 
+# 
+screen_DIR = $(PROJDIR)/package/screen
+screen_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(screen_DIR)/src
+screen_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+screen: screen_;
+
+screen_dir:
+	git clone git://git.savannah.gnu.org/screen.git $(screen_DIR)_hot
+	ln -sf $(screen_DIR)_hot $(screen_DIR)
+
+screen_clean screen_distclean:
+	if [ -e $(screen_DIR)/src/Makefile ]; then \
+	  $(screen_MAKE) $(patsubst _%,%,$(@:screen%=%)); \
+	fi
+
+screen_configure:
+	cd $(screen_DIR)/src && ./autogen.sh
+
+screen_makefile:
+	cd $(screen_DIR)/src && ./configure $(screen_CFGPARAM)
+
+screen%:
+	if [ ! -d $(screen_DIR) ]; then \
+	  $(MAKE) screen_dir; \
+	fi
+	if [ ! -e $(screen_DIR)/src/configure ]; then \
+	  $(MAKE) screen_configure; \
+	fi
+	if [ ! -e $(screen_DIR)/src/Makefile ]; then \
+	  $(MAKE) screen_makefile; \
+	fi
+	$(screen_MAKE) $(patsubst _%,%,$(@:screen%=%))
+
+CLEAN += screen
 
 #------------------------------------
 #
@@ -1364,6 +1407,14 @@ firmware-pi_dir: ;
 
 #------------------------------------
 #
+obj_screen:
+	$(MAKE) ncurses_install screen_install
+
+obj_bluez:
+	$(MAKE) libffi_install zlib_install ncurses_install expat_install \
+	    glib_install readline_install libical_install dbus_install \
+	    bluez_install
+
 devlist:
 	echo -n "" > $@
 	echo "dir /dev 0755 0 0" >> $@

@@ -3,11 +3,12 @@
 . /etc/rc.d/init.d/functions
 
 PIDFILE=/var/run/bluetoothd
+DAEMON=/libexec/bluetooth/bluetoothd
 
 case "$1" in
 start)
   echo -n "Start Bluetooth Daemon ..."
-  bluetoothd & echo -n "$!" > $PIDFILE
+  $DAEMON & echo -n "$!" > $PIDFILE
   check_status
   ;;
 stop)
