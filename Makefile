@@ -1283,6 +1283,22 @@ CLEAN += gpioctl-pi
 
 #------------------------------------
 #
+rtl8192cu_DIR = $(PROJDIR)/package/rtl8192cu
+
+rtl8192cu_dir:
+	cd $(dir $(rtl8192cu_DIR)) && \
+	  unzip 0001-RTL8188C_8192C_USB_linux_v4.0.2_9000.20130911.zip
+	cd $(dir $(rtl8192cu_DIR))/RTL8188C_8192C_USB_linux_v4.0.2_9000.20130911/driver && \
+	  tar -zxvf rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911.tar.gz
+	ln -sf $(dir $(rtl8192cu_DIR))/RTL8188C_8192C_USB_linux_v4.0.2_9000.20130911/driver/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911 $(rtl8192cu_DIR)
+
+rtl8192cu rtl8192cu_%:
+	$(MAKE) DESTDIR=$(DESTDIR) $(linux_MAKEPARAM) KSRC=$(linux_DIR) \
+	    CONFIG_PLATFORM_I386_PC=n CONFIG_PLATFORM_TI_AM3517=y \
+	    -C $(rtl8192cu_DIR) $(patsubst _%,%,$(@:rtl8192cu%=%))
+
+#------------------------------------
+#
 tool: $(PROJDIR)/tool/bin/mkimage
 
 $(PROJDIR)/tool/bin/mkimage:
@@ -1395,6 +1411,18 @@ avrdude%:
 CLEAN += avrdude
 
 #------------------------------------
+#
+firmware-linux_DIR = $(PROJDIR)/package/firmware-linux
+
+firmware-linux_dir:
+	git clone --depth=1 git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git $(firmware-linux_DIR); \
+
+firmware-linux firmware-linux%:
+	if [ ! -d $(firmware-linux_DIR) ]; then \
+	  $(MAKE) firmware-linux_dir; \
+	fi
+
+#------------------------------------
 # git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi
 #
 firmware-pi_DIR = $(PROJDIR)/package/firmware-pi
@@ -1472,7 +1500,7 @@ ifeq ("$(PLATFORM)","PI2")
 	    DESTDIR=$(userland_DIR) prebuilt
 endif
 
-userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf)
+userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf) firmware-linux
 	for i in proc sys dev tmp var/run var/empty; do \
 	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
@@ -1514,6 +1542,10 @@ endif
 	$(MAKE) SRCFILE="moduli ssh_config sshd_config" \
 	    SRCDIR=$(DESTDIR)/etc \
 	    DESTDIR=$(userland_DIR)/etc dist-cp
+	# ath9k_htc
+	$(MAKE) SRCFILE="htc_9271-1.4.0.fw" \
+	    SRCDIR=$(firmware-linux_DIR)/ath9k_htc \
+	    DESTDIR=$(userland_DIR)/lib/firmware/ath9k_htc dist-cp
 
 .PHONY: userland
 
