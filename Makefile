@@ -444,6 +444,24 @@ CLEAN += findme
 
 #------------------------------------
 #
+wireless-tools_DIR = $(PROJDIR)/package/wireless-tools
+wireless-tools_MAKE = $(MAKE) PREFIX=$(DESTDIR) CC=$(CC) AR=$(AR) \
+    RANLIB=$(RANLIB) BUILD_STATIC=1 -C $(wireless-tools_DIR)
+
+wireless-tools_dir:
+	cd $(dir $(wireless-tools_DIR)) && \
+	  wget http://www.labs.hpe.com/personal/Jean_Tourrilhes/Linux/wireless_tools.29.tar.gz && \
+	  tar -zxvf wireless_tools.29.tar.gz
+	ln -sf $(dir $(wireless-tools_DIR))/wireless_tools.29 $(wireless-tools_DIR)
+
+wireless-tools wireless-tools%:
+	if [ ! -d $(wireless-tools_DIR) ]; then \
+	  $(MAKE) wireless-tools_dir; \
+	fi
+	$(wireless-tools_MAKE) $(patsubst _%,%,$(@:wireless-tools%=%))
+
+#------------------------------------
+#
 iperf_DIR = $(PROJDIR)/package/iperf
 iperf_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(iperf_DIR)
 iperf_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
@@ -1071,6 +1089,32 @@ libnl%:
 CLEAN += libnl
 
 #------------------------------------
+# dependent: openssl libnl
+#
+wpa-supplicant_DIR = $(PROJDIR)/package/wpa-supplicant
+wpa-supplicant_MAKE = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(DESTDIR) \
+    $(MAKE) CC=$(CC) DESTDIR=$(DESTDIR) BINDIR=/sbin LIBDIR=/lib INCDIR=/include \
+    EXTRA_CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+	CONFIG_LIBNL32=y CONFIG_LIBNL3_ROUTE=y CONFIG_WPS=1 CONFIG_SMARTCARD=n V=1 \
+    -C $(wpa-supplicant_DIR)/wpa_supplicant
+
+wpa-supplicant_dir:
+	cd $(dir $(wpa-supplicant_DIR)) && \
+	  wget https://w1.fi/releases/wpa_supplicant-2.5.tar.gz && \
+	  tar -zxvf wpa_supplicant-2.5.tar.gz
+	ln -sf $(dir $(wpa-supplicant_DIR))/wpa_supplicant-2.5 $(wpa-supplicant_DIR)
+
+wpa-supplicant wpa-supplicant%:
+	if [ ! -d $(wpa-supplicant_DIR) ]; then \
+	  $(MAKE) wpa-supplicant_dir; \
+	fi
+	if [ ! -e $(wpa-supplicant_DIR)/wpa_supplicant/.config ]; then \
+	  cp $(wpa-supplicant_DIR)/wpa_supplicant/defconfig $(wpa-supplicant_DIR)/wpa_supplicant/.config; \
+	fi
+	$(wpa-supplicant_MAKE) $(patsubst _%,%,$(@:wpa-supplicant%=%))
+
+#------------------------------------
 #
 x264_DIR = $(PROJDIR)/package/x264
 x264_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(x264_DIR)
@@ -1500,7 +1544,7 @@ ifeq ("$(PLATFORM)","PI2")
 	    DESTDIR=$(userland_DIR) prebuilt
 endif
 
-userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf) firmware-linux
+userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf wireless-tools) firmware-linux
 	for i in proc sys dev tmp var/run var/empty; do \
 	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
@@ -1523,8 +1567,8 @@ endif
 	    SRCFILE+="curl socat findme" \
 	    SRCDIR=$(DESTDIR)/bin \
 	    DESTDIR=$(userland_DIR)/bin dist-cp
-	# openssh
-	$(MAKE) SRCFILE="sshd" \
+	# openssh wireless-tools
+	$(MAKE) SRCFILE="sshd ifrename iwconfig iwevent iwgetid iwlist iwpriv iwspy" \
 	    SRCDIR=$(DESTDIR)/sbin \
 	    DESTDIR=$(userland_DIR)/sbin dist-cp
 	# libz json-c libmoss iperf openssl curl
@@ -1542,12 +1586,38 @@ endif
 	$(MAKE) SRCFILE="moduli ssh_config sshd_config" \
 	    SRCDIR=$(DESTDIR)/etc \
 	    DESTDIR=$(userland_DIR)/etc dist-cp
-	# ath9k_htc
+	# ath9k_htc/VIA_VNT9271BU0DB/AR9271
 	$(MAKE) SRCFILE="htc_9271-1.4.0.fw" \
 	    SRCDIR=$(firmware-linux_DIR)/ath9k_htc \
 	    DESTDIR=$(userland_DIR)/lib/firmware/ath9k_htc dist-cp
+	# rtl8xxxu/Edimax_EW-7722UTn_v2/RTL8192CU
+	$(MAKE) SRCFILE="rtl8192cufw_TMSC.bin" \
+	    SRCDIR=$(firmware-linux_DIR)/rtlwifi \
+	    DESTDIR=$(userland_DIR)/lib/firmware/rtlwifi dist-cp
 
 .PHONY: userland
+
+userland-wpa: $(addsuffix _install,libnl openssl)
+	$(MAKE) $(addsuffix _install,wpa-supplicant)
+	# openssl
+	$(MAKE) SRCFILE="openssl" \
+	    SRCDIR=$(DESTDIR)/bin \
+	    DESTDIR=$(userland_DIR)/bin dist-cp
+	# openssl
+	$(MAKE) SRCFILE="openssl" \
+	    SRCDIR=$(DESTDIR)/usr \
+	    DESTDIR=$(userland_DIR)/usr dist-cp
+	# libnl openssl
+	$(MAKE) SRCFILE="libnl-3.so libnl-3.so.* libnl-genl-3.so libnl-genl-3.so.*" \
+	    SRCFILE+="libnl-idiag-3.so libnl-idiag-3.so.* libnl-nf-3.so libnl-nf-3.so.*" \
+	    SRCFILE+="libnl-route-3.so libnl-route-3.so.*" \
+	    SRCFILE+="libcrypto.so libcrypto.so.* libssl.so libssl.so.* engines" \
+	    SRCDIR=$(DESTDIR)/lib \
+	    DESTDIR=$(userland_DIR)/lib dist-cp
+	# wpa-supplicant
+	$(MAKE) SRCFILE="wpa_cli wpa_passphrase wpa_supplicant" \
+	    SRCDIR=$(DESTDIR)/sbin \
+	    DESTDIR=$(userland_DIR)/sbin dist-cp
 
 userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
 	$(MAKE) $(addsuffix _install,readline glib dbus)
