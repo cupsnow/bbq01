@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = BB
+PLATFORM = BBB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -46,6 +46,8 @@ env.sh: ;
 	echo "export LD="'"'"$(LD)"'"' >> $@
 	echo "export PLATFORM_CFLAGS="'"'"$(PLATFORM_CFLAGS)"'"' >> $@
 	echo "export PLATFORM_LDFLAGS="'"'"$(PLATFORM_LDFLAGS)"'"' >> $@
+	echo "export PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)" >> $@
+	echo "export PKG_CONFIG_PATH=${PKG_CONFIG_SYSROOT_DIR}/lib/pkgconfig" >> $@
 
 .PHONY: env.sh
 
@@ -402,6 +404,7 @@ libmoss%:
 CLEAN += libmoss
 
 #------------------------------------
+# dependent: libmoss
 #
 findme_DIR = $(PROJDIR)/package/findme
 findme_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(findme_DIR)
@@ -797,6 +800,7 @@ CLEAN += p11-kit
 
 #------------------------------------
 # dependency: ncurses
+# ftp://ftp.cwru.edu/pub/bash/readline-6.3.tar.gz
 #
 readline_DIR = $(PROJDIR)/package/readline
 readline_MAKE = $(MAKE) DESTDIR=$(DESTDIR) SHLIB_LIBS=-lncurses -C $(readline_DIR)
@@ -809,7 +813,7 @@ readline: readline_;
 
 readline_dir:
 	cd $(dir $(readline_DIR)) && \
-	wget ftp://ftp.cwru.edu/pub/bash/readline-6.3.tar.gz && \
+	wget http://ftp.gnu.org/gnu/readline/readline-6.3.tar.gz && \
 	    tar -zxvf readline-6.3.tar.gz && \
 	    ln -sf readline-6.3 readline
 
@@ -1015,6 +1019,22 @@ screen%:
 	$(screen_MAKE) $(patsubst _%,%,$(@:screen%=%))
 
 CLEAN += screen
+
+#------------------------------------
+# dependent: libmoss dbus
+#
+blur_DIR = $(PROJDIR)/package/blur
+blur_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(blur_DIR)
+blur_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
+    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
+blur_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    $(blur_CFGENV)
+
+blur_makefile:
+	cd $(blur_DIR) && $(blur_CFGENV) ./configure $(blur_CFGPARAM)
+
 
 #------------------------------------
 #

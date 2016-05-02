@@ -22,7 +22,7 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
 echo "Start in initramfs"
 
-. /etc/rc.d/init.d/sysinit
+[ -e /etc/rc.d/init.d/sysinit ] && . /etc/rc.d/init.d/sysinit
 
 gotonewroot
 
