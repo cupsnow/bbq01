@@ -133,6 +133,23 @@
 		>;
 	};
 	
+	backlight_pins_s0: backlight_pins_s0 {
+		pinctrl-single,pins = <
+			AM33XX_IOPAD(0x848, PIN_OUTPUT | MUX_MODE6) /* gpmc_a2.gpio1_18 */
+			AM33XX_IOPAD(0x84c, PIN_OUTPUT | MUX_MODE6) /* gpmc_a3.gpio1_19 */
+		>;
+	};
+
+};
+
+&epwmss1 {
+	status = "okay";
+};
+
+&ehrpwm1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&backlight_pins_s0>;
 };
 
 &lcdc {
