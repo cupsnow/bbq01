@@ -64,8 +64,9 @@ int main()
 		log_error("DRM_IOCTL_MODE_GETRESOURCES: %s(%d)\n", strerror(r), r);
 		goto finally;
 	}
-
-	printf("fb: %d, crtc: %d, conn: %d, enc: %d\n",res.count_fbs,res.count_crtcs,res.count_connectors,res.count_encoders);
+	log_debug("resource count, fb: %d, crtc: %d, conn: %d, enc: %d\n",
+			res.count_fbs, res.count_crtcs, res.count_connectors,
+			res.count_encoders);
 
 	void *fb_base[10];
 	long fb_w[10];
@@ -90,6 +91,9 @@ int main()
 		conn.prop_values_ptr=(uint64_t)conn_propval_buf;
 		conn.encoders_ptr=(uint64_t)conn_enc_buf;
 		ioctl(dri_fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn);	//get connector resources
+		log_debug("connector%d connection: %d, count, mode: %d, prop: %d, enc: %d\n",
+				conn.connector_id, conn.connection, conn.count_modes,
+				conn.count_props, conn.count_encoders);
 
 		//Check if the connector is OK to use (connected to something)
 		if (conn.count_encoders<1 || conn.count_modes<1 || !conn.encoder_id || !conn.connection)
