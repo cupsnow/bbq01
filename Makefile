@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = BBB
+PLATFORM = BB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -56,6 +56,70 @@ env.sh: ;
 tool: ;
 
 .PHONY: tool
+
+#------------------------------------
+#
+ne10_DIR = $(PROJDIR)/package/ne10
+
+ne10_dir:
+	git clone --depth=1 http://github.com/projectNe10/Ne10 $(ne10_DIR)_hot
+	ln -sf $(ne10_DIR)_hot $(ne10_DIR)
+
+
+ne10: ne10_;
+
+
+#------------------------------------
+#
+mbedtls_DIR = $(PROJDIR)/package/mbedtls
+mbedtls_MAKE = $(MAKE) DESTDIR=$(DESTDIR) CC=$(CC) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fomit-frame-pointer" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    -C $(mbedtls_DIR)
+
+mbedtls_dir:
+	cd $(dir $(mbedtls_DIR)) && \
+	  wget https://tls.mbed.org/download/mbedtls-2.2.1-apache.tgz && \
+	  tar -zxvf mbedtls-2.2.1-apache.tgz && \
+	  ln -sf mbedtls-2.2.1 $(notdir $(mbedtls_DIR))
+
+mbedtls: mbedtls_;
+
+mbedtls%:
+	if [ ! -d $(mbedtls_DIR) ]; then \
+	  $(MAKE) mbedtls_dir; \
+	fi
+	$(mbedtls_MAKE) $(patsubst _%,%,$(@:mbedtls%=%))
+
+#------------------------------------
+#
+libressl_DIR = $(PROJDIR)/package/libressl
+libressl_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libressl_DIR) 
+libressl_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    --enable-nc --with-openssldir=/usr/openssl \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+libressl_dir:
+	cd $(dir $(libressl_DIR)) && \
+	  wget http://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-2.3.4.tar.gz && \
+	  tar -zxvf libressl-2.3.4.tar.gz && \
+	  ln -sf libressl-2.3.4 $(notdir $(libressl_DIR))
+
+libressl: libressl_;
+
+libressl_makefile:
+	cd $(libressl_DIR) && \
+	  $(libressl_CFGENV) ./configure $(libressl_CFGPARAM)
+
+libressl%:
+	if [ ! -d $(libressl_DIR) ]; then \
+	  $(MAKE) libressl_dir; \
+	fi
+	if [ ! -f $(libressl_DIR)/Makefile ]; then \
+	  $(MAKE) libressl_makefile; \
+	fi
+	$(libressl_MAKE) $(patsubst _%,%,$(@:libressl%=%))
 
 #------------------------------------
 #
@@ -1259,6 +1323,44 @@ ffmpeg%:
 	$(ffmpeg_MAKE) $(patsubst _%,%,$(@:ffmpeg%=%))
 
 CLEAN += ffmpeg
+
+#------------------------------------
+#
+libdrm_DIR = $(PROJDIR)/package/libdrm
+libdrm_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libdrm_DIR)
+#libdrm_TERMINFODIR = /etc/terminfo
+libdrm_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` --enable-static \
+    --with-kernel-source=$(linux_DIR) \
+    $(addprefix --disable-,intel radeon amdgpu nouveau vmwgfx freedreno vc4) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+libdrm: libdrm_;
+
+libdrm_dir:
+	cd $(dir $(libdrm_DIR)) && \
+	  wget https://dri.freedesktop.org/libdrm/libdrm-2.4.68.tar.bz2 && \
+	  tar -jxvf libdrm-2.4.68.tar.bz2 && \
+	  ln -sf libdrm-2.4.68 $(libdrm_DIR)
+
+libdrm_clean libdrm_distclean:
+	if [ -e $(libdrm_DIR)/Makefile ]; then \
+	  $(libdrm_MAKE) $(patsubst _%,%,$(@:libdrm%=%)); \
+	fi
+
+libdrm_makefile:
+	cd $(libdrm_DIR) && ./configure $(libdrm_CFGPARAM)
+
+libdrm%:
+	if [ ! -d $(libdrm_DIR) ]; then \
+	  $(MAKE) libdrm_dir; \
+	fi
+	if [ ! -e $(libdrm_DIR)/Makefile ]; then \
+	  $(MAKE) libdrm_makefile; \
+	fi
+	$(libdrm_MAKE) $(patsubst _%,%,$(@:libdrm%=%))
+
+CLEAN += libdrm
 
 #------------------------------------
 #
