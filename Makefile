@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = BB
+PLATFORM = PI2
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -166,6 +166,7 @@ linux_MAKEPARAM = CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
     KDIR=$(linux_DIR)
 
 ifeq ("$(PLATFORM)","PI2")
+linux_MAKEPARAM += LOADADDR=0x0C100000
 else
 linux_MAKEPARAM += LOADADDR=0x80008000
 endif
@@ -175,23 +176,28 @@ linux_MAKE = $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR)
 linux: linux_;
 
 linux_dir:
-ifeq ("$(PLATFORM)","PI2")
-	if [ -d $(linux_DIR)-pi2 ]; then \
-	  cd $(linux_DIR)-pi2; git pull --depth=1; \
-	else \
-	  git clone --depth=1 https://github.com/raspberrypi/linux $(linux_DIR)-pi2 && \
-	  ln -sf $(notdir $(linux_DIR)-pi2) $(linux_DIR); \
-	fi
-else
+#ifeq ("$(PLATFORM)","PI2")
+#	if [ -d $(linux_DIR)-pi2 ]; then \
+#	  cd $(linux_DIR)-pi2; git pull --depth=1; \
+#	else \
+#	  git clone --depth=1 https://github.com/raspberrypi/linux $(linux_DIR)-pi2 && \
+#	  ln -sf $(notdir $(linux_DIR)-pi2) $(linux_DIR); \
+#	fi
+#else
+#	cd $(dir $(linux_DIR)) && \
+#	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.6.3.tar.xz && \
+#	  tar -Jxvf linux-4.6.3.tar.xz
 	cd $(dir $(linux_DIR)) && \
-	  wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.5.1.tar.xz && \
-	  tar -Jxvf linux-4.5.1.tar.xz && \
-	  ln -sf linux-4.5.1 $(notdir $(linux_DIR))
-endif
+	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.7-rc5.tar.xz && \
+	  tar -Jxvf linux-4.7-rc5.tar.xz
+	cd $(dir $(linux_DIR)) && \
+	  ln -sf linux-4.7-rc5 $(notdir $(linux_DIR))	  
+#endif
 
 linux_config:
 ifeq ("$(PLATFORM)","PI2")
-	$(linux_MAKE) bcm2709_defconfig
+#	$(linux_MAKE) bcm2709_defconfig
+	$(linux_MAKE) multi_v7_defconfig
 else ifeq ("$(PLATFORM)","BBB")
 	$(linux_MAKE) multi_v7_defconfig
 else ifeq ("$(PLATFORM)","BB")
@@ -576,9 +582,9 @@ curl: curl_;
 
 curl_dir:
 	cd $(dir $(curl_DIR)) && \
-	  wget http://curl.haxx.se/download/curl-7.43.0.tar.bz2 && \
-	  tar -jxvf curl-7.43.0.tar.bz2 && \
-	  ln -sf curl-7.43.0 $(curl_DIR) && \
+	  wget https://curl.haxx.se/download/curl-7.49.0.tar.bz2 && \
+	  tar -jxvf curl-7.49.0.tar.bz2 && \
+	  ln -sf curl-7.49.0 $(curl_DIR) && \
 	  $(RM) $(curl_DIR)/Makefile
 
 curl_clean curl_distclean:
@@ -1716,6 +1722,13 @@ endif
 	$(MAKE) SRCFILE="rtl8192cufw_TMSC.bin" \
 	    SRCDIR=$(firmware-linux_DIR)/rtlwifi \
 	    DESTDIR=$(userland_DIR)/lib/firmware/rtlwifi dist-cp
+	$(MAKE) test_fb01 test_drm01
+	$(MAKE) SRCFILE="fb01" \
+	    SRCDIR=$(PROJDIR)/test/fb01/bin \
+	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
+	$(MAKE) SRCFILE="drm01" \
+	    SRCDIR=$(PROJDIR)/test/drm01/bin \
+	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
 
 .PHONY: userland
 
@@ -1796,15 +1809,25 @@ dist: linux_uImage # userland
 	$(MKDIR) $(distdir)
 ifeq ("$(PLATFORM)","PI2")
 	$(CP) $(linux_DIR)/arch/arm/boot/zImage \
-	    $(distdir)/kernel.img
-	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2709-rpi-2-b.dtb \
+	    $(distdir)/kernel.img	    
+#	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2709-rpi-2-b.dtb \
+#	    $(firmware-pi_DIR)/boot/bootcode.bin \
+#	    $(firmware-pi_DIR)/boot/start.elf \
+#	    $(firmware-pi_DIR)/boot/fixup.dat \
+#	    $(firmware-pi_DIR)/boot/start_x.elf \
+#	    $(firmware-pi_DIR)/boot/fixup_x.dat \
+#	    $(PROJDIR)/prebuilt/boot-pi/* \
+#	    $(distdir)/
+	$(CP) \
 	    $(firmware-pi_DIR)/boot/bootcode.bin \
 	    $(firmware-pi_DIR)/boot/start.elf \
 	    $(firmware-pi_DIR)/boot/fixup.dat \
 	    $(firmware-pi_DIR)/boot/start_x.elf \
 	    $(firmware-pi_DIR)/boot/fixup_x.dat \
 	    $(PROJDIR)/prebuilt/boot-pi/* \
-	    $(distdir)/
+	    $(distdir)/	    
+	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2836-rpi-2-b.dtb \
+	    $(distdir)/bcm2709-rpi-2-b.dtb
 else ifeq ("$(PLATFORM)","XM")
 	$(MAKE) initramfs uboot linux_dtbs
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
