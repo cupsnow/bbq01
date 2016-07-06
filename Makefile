@@ -1334,10 +1334,10 @@ CLEAN += ffmpeg
 #
 libdrm_DIR = $(PROJDIR)/package/libdrm
 libdrm_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libdrm_DIR)
-#libdrm_TERMINFODIR = /etc/terminfo
 libdrm_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` --enable-static \
     --with-kernel-source=$(linux_DIR) \
-    $(addprefix --disable-,intel radeon amdgpu nouveau vmwgfx freedreno vc4) \
+    $(addprefix --disable-,intel radeon amdgpu nouveau vmwgfx freedreno) \
+    $(addprefix --enable-,omap-experimental-api install-test-programs) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -1345,7 +1345,7 @@ libdrm: libdrm_;
 
 libdrm_dir:
 	cd $(dir $(libdrm_DIR)) && \
-	  wget https://dri.freedesktop.org/libdrm/libdrm-2.4.68.tar.bz2 && \
+	  wget --progress=bar -N https://dri.freedesktop.org/libdrm/libdrm-2.4.68.tar.bz2 && \
 	  tar -jxvf libdrm-2.4.68.tar.bz2 && \
 	  ln -sf libdrm-2.4.68 $(libdrm_DIR)
 
@@ -1367,6 +1367,263 @@ libdrm%:
 	$(libdrm_MAKE) $(patsubst _%,%,$(@:libdrm%=%))
 
 CLEAN += libdrm
+
+#------------------------------------
+# 
+libcap_DIR = $(PROJDIR)/package-dev/libcap
+libcap_MAKE = $(MAKE) CC=$(CC) BUILD_CC=gcc prefix=/ lib=lib RAISE_SETFCAP=no \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+    BUILD_CFLAGS="" \
+    DESTDIR=$(DESTDIR) -C $(libcap_DIR)
+
+libcap: libcap_;
+
+libcap_dir:
+	cd $(dir $(libcap_DIR)) && \
+	  wget --progress=bar -N https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.25.tar.xz && \
+	  tar -Jxvf libcap-2.25.tar.xz && \
+	  ln -sf libcap-2.25 $(libcap_DIR)
+
+libcap_clean libcap_distclean:
+	if [ -e $(libcap_DIR)/Makefile ]; then \
+	  $(libcap_MAKE) $(patsubst _%,%,$(@:libcap%=%)); \
+	fi
+
+libcap%:
+	if [ ! -d $(libcap_DIR) ]; then \
+	  $(MAKE) libcap_dir; \
+	fi
+	$(libcap_MAKE) $(patsubst _%,%,$(@:libcap%=%))
+
+CLEAN += libcap
+
+#------------------------------------
+# 
+util-linux_DIR = $(PROJDIR)/package-dev/util-linux
+util-linux_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(util-linux_DIR)
+util-linux_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    $(addprefix --without-,tinfo) \
+    $(addprefix --disable-,nls all-programs) \
+    $(addprefix --enable-,libuuid uuidd) \
+    $(addprefix --enable-,libblkid libmount libmount-force-mountinfo mount) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+util-linux: util-linux_;
+
+util-linux_dir:
+	cd $(dir $(util-linux_DIR)) && \
+	  wget --progress=bar -N https://www.kernel.org/pub/linux/utils/util-linux/v2.28/util-linux-2.28.tar.xz && \
+	  tar -Jxvf util-linux-2.28.tar.xz && \
+	  ln -sf util-linux-2.28 $(util-linux_DIR)
+
+util-linux_clean util-linux_distclean:
+	if [ -e $(util-linux_DIR)/Makefile ]; then \
+	  $(util-linux_MAKE) $(patsubst _%,%,$(@:util-linux%=%)); \
+	fi
+
+util-linux_makefile:
+	cd $(util-linux_DIR) && ./configure $(util-linux_CFGPARAM)
+
+util-linux%:
+	if [ ! -d $(util-linux_DIR) ]; then \
+	  $(MAKE) util-linux_dir; \
+	fi
+	if [ ! -e $(util-linux_DIR)/Makefile ]; then \
+	  $(MAKE) util-linux_makefile; \
+	fi
+	$(util-linux_MAKE) $(patsubst _%,%,$(@:util-linux%=%))
+
+CLEAN += util-linux
+
+#------------------------------------
+# 
+systemd_DIR = $(PROJDIR)/package-dev/systemd
+systemd_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(systemd_DIR)
+systemd_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
+    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
+systemd_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    $(addprefix --disable-,nsl dbus xkbcommon seccomp ima selinux apparmor) \
+    $(addprefix --disable-,smack gcrypt audit libcryptsetup libcurl libidn) \
+    $(addprefix --disable-,libiptc) \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/usr/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -L$(DESTDIR)/usr/lib"
+
+systemd: systemd_;
+
+systemd_dir:
+	cd $(dir $(systemd_DIR)) && \
+	  wget --progress=bar -N https://github.com/systemd/systemd/archive/v230.tar.gz \
+	      -O systemd-v230.tar.gz && \
+	  tar -zxvf systemd-v230.tar.gz && \
+	  ln -sf systemd-v230 $(systemd_DIR)
+
+systemd_clean systemd_distclean:
+	if [ -e $(systemd_DIR)/Makefile ]; then \
+	  $(systemd_MAKE) $(patsubst _%,%,$(@:systemd%=%)); \
+	fi
+
+systemd_makefile:
+	cd $(systemd_DIR) && \
+	  $(systemd_CFGENV) ./configure $(systemd_CFGPARAM)
+
+systemd%:
+	if [ ! -d $(systemd_DIR) ]; then \
+	  $(MAKE) systemd_dir; \
+	fi
+	if [ ! -e $(systemd_DIR)/Makefile ]; then \
+	  $(MAKE) systemd_makefile; \
+	fi
+	$(systemd_MAKE) $(patsubst _%,%,$(@:systemd%=%))
+
+CLEAN += systemd
+
+#------------------------------------
+#
+dri2proto_DIR = $(PROJDIR)/package-dev/dri2proto
+dri2proto_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(dri2proto_DIR)
+dri2proto_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+dri2proto: dri2proto_;
+
+dri2proto_dir:
+	cd $(dir $(dri2proto_DIR)) && \
+	  wget --progress=bar -N https://www.x.org/releases/individual/proto/dri2proto-2.8.tar.bz2 && \
+	  tar -jxvf dri2proto-2.8.tar.bz2 && \
+	  ln -sf dri2proto-2.8 $(dri2proto_DIR)
+
+dri2proto_clean dri2proto_distclean:
+	if [ -e $(dri2proto_DIR)/Makefile ]; then \
+	  $(dri2proto_MAKE) $(patsubst _%,%,$(@:dri2proto%=%)); \
+	fi
+
+dri2proto_makefile:
+	cd $(dri2proto_DIR) && ./configure $(dri2proto_CFGPARAM)
+
+dri2proto%:
+	if [ ! -d $(dri2proto_DIR) ]; then \
+	  $(MAKE) dri2proto_dir; \
+	fi
+	if [ ! -e $(dri2proto_DIR)/Makefile ]; then \
+	  $(MAKE) dri2proto_makefile; \
+	fi
+	$(dri2proto_MAKE) $(patsubst _%,%,$(@:dri2proto%=%))
+
+CLEAN += dri2proto
+
+#------------------------------------
+#
+dri3proto_DIR = $(PROJDIR)/package-dev/dri3proto
+dri3proto_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(dri3proto_DIR)
+dri3proto_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+dri3proto: dri3proto_;
+
+dri3proto_dir:
+	cd $(dir $(dri3proto_DIR)) && \
+	  wget --progress=bar -N https://www.x.org/releases/individual/proto/dri3proto-1.0.tar.bz2 && \
+	  tar -jxvf dri3proto-1.0.tar.bz2 && \
+	  ln -sf dri3proto-1.0 $(dri3proto_DIR)
+
+dri3proto_clean dri3proto_distclean:
+	if [ -e $(dri3proto_DIR)/Makefile ]; then \
+	  $(dri3proto_MAKE) $(patsubst _%,%,$(@:dri3proto%=%)); \
+	fi
+
+dri3proto_makefile:
+	cd $(dri3proto_DIR) && ./configure $(dri3proto_CFGPARAM)
+
+dri3proto%:
+	if [ ! -d $(dri3proto_DIR) ]; then \
+	  $(MAKE) dri3proto_dir; \
+	fi
+	if [ ! -e $(dri3proto_DIR)/Makefile ]; then \
+	  $(MAKE) dri3proto_makefile; \
+	fi
+	$(dri3proto_MAKE) $(patsubst _%,%,$(@:dri3proto%=%))
+
+CLEAN += dri3proto
+
+#------------------------------------
+#
+presentproto_DIR = $(PROJDIR)/package-dev/presentproto
+presentproto_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(presentproto_DIR)
+presentproto_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+presentproto: presentproto_;
+
+presentproto_dir:
+	cd $(dir $(presentproto_DIR)) && \
+	  wget --progress=bar -N https://www.x.org/releases/individual/proto/presentproto-1.0.tar.bz2 && \
+	  tar -jxvf presentproto-1.0.tar.bz2 && \
+	  ln -sf presentproto-1.0 $(presentproto_DIR)
+
+presentproto_clean presentproto_distclean:
+	if [ -e $(presentproto_DIR)/Makefile ]; then \
+	  $(presentproto_MAKE) $(patsubst _%,%,$(@:presentproto%=%)); \
+	fi
+
+presentproto_makefile:
+	cd $(presentproto_DIR) && ./configure $(presentproto_CFGPARAM)
+
+presentproto%:
+	if [ ! -d $(presentproto_DIR) ]; then \
+	  $(MAKE) presentproto_dir; \
+	fi
+	if [ ! -e $(presentproto_DIR)/Makefile ]; then \
+	  $(MAKE) presentproto_makefile; \
+	fi
+	$(presentproto_MAKE) $(patsubst _%,%,$(@:presentproto%=%))
+
+CLEAN += presentproto
+
+#------------------------------------
+#
+mesa_DIR = $(PROJDIR)/package-dev/mesa
+mesa_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mesa_DIR)
+mesa_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
+    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
+mesa_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
+    $(addprefix --disable-,dri3) \
+    --with-gallium-drivers=vc4 --with-dri-drivers= \
+    --with-egl-platforms=drm \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libdrm -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+mesa: mesa_;
+
+mesa_dir:
+	cd $(dir $(mesa_DIR)) && \
+	  wget --progress=bar -N ftp://ftp.freedesktop.org/pub/mesa/11.2.2/mesa-11.2.2.tar.xz && \
+	  tar -Jxvf mesa-11.2.2.tar.xz && \
+	  ln -sf mesa-11.2.2 $(mesa_DIR)
+
+mesa_clean mesa_distclean:
+	if [ -e $(mesa_DIR)/Makefile ]; then \
+	  $(mesa_MAKE) $(patsubst _%,%,$(@:mesa%=%)); \
+	fi
+
+mesa_makefile:
+	cd $(mesa_DIR) && \
+	  $(mesa_CFGENV) ./configure $(mesa_CFGPARAM)
+
+mesa%:
+	if [ ! -d $(mesa_DIR) ]; then \
+	  $(MAKE) mesa_dir; \
+	fi
+	if [ ! -e $(mesa_DIR)/Makefile ]; then \
+	  $(MAKE) mesa_makefile; \
+	fi
+	$(mesa_MAKE) $(patsubst _%,%,$(@:mesa%=%))
+
+CLEAN += mesa
 
 #------------------------------------
 #
