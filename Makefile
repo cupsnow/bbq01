@@ -1444,9 +1444,17 @@ systemd_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(systemd_DIR)
 systemd_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
     PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
 systemd_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    $(addprefix --disable-,nsl dbus xkbcommon seccomp ima selinux apparmor) \
-    $(addprefix --disable-,smack gcrypt audit libcryptsetup libcurl libidn) \
-    $(addprefix --disable-,libiptc) \
+    $(addprefix --without-,kill-user-processes) \
+    $(addprefix --disable-,nls dbus utmp kmod xkbcommon blkid seccomp ima) \
+    $(addprefix --disable-,selinux apparmor adm-group wheel-group xz zlib) \
+    $(addprefix --disable-,bzip2 lz4 pam acl smack gcrypt audit elfutils) \
+    $(addprefix --disable-,libcryptsetup grencode gnutls microhttpd libcurl) \
+    $(addprefix --disable-,libidn libiptc binfmt vconsole quotacheck tmpfiles) \
+    $(addprefix --disable-,sysusers firstboot randomseed backlight rfkill) \
+    $(addprefix --disable-,logind machined importd hostnamed timedated) \
+    $(addprefix --disable-,timesyncd localed coredump polkit resolved networkd) \
+    $(addprefix --disable-,efi gnuefi tpm kdbus myhostname hwdb manpages) \
+    $(addprefix --disable-,hibernate ldconfig split-usr tests) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/usr/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -L$(DESTDIR)/usr/lib"
 
