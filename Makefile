@@ -1404,9 +1404,8 @@ util-linux_DIR = $(PROJDIR)/package-dev/util-linux
 util-linux_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(util-linux_DIR)
 util-linux_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     $(addprefix --without-,tinfo ncurses btrfs) \
-    $(addprefix --disable-,nls all-programs bfs cramfs bash-completion) \
-    $(addprefix --enable-,libuuid libblkid libmount libmount-force-mountinfo mount) \
-    $(addprefix --enable-,uuidd mount agetty) \
+    $(addprefix --disable-,nls all-programs bfs cramfs bash-completion pylibmount) \
+    $(addprefix --enable-,libuuid libblkid libmount libmount-force-mountinfo) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -1603,7 +1602,7 @@ mesa_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mesa_DIR)
 mesa_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
     PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
 mesa_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    $(addprefix --disable-,dri3 glx) \
+    $(addprefix --disable-,glx) \
     --with-gallium-drivers=vc4 --with-dri-drivers= \
     --with-egl-platforms=drm \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libdrm -fPIC" \
