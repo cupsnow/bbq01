@@ -1403,10 +1403,10 @@ CLEAN += libcap
 util-linux_DIR = $(PROJDIR)/package-dev/util-linux
 util-linux_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(util-linux_DIR)
 util-linux_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    $(addprefix --without-,tinfo) \
-    $(addprefix --disable-,nls all-programs) \
-    $(addprefix --enable-,libuuid uuidd) \
-    $(addprefix --enable-,libblkid libmount libmount-force-mountinfo mount) \
+    $(addprefix --without-,tinfo ncurses btrfs) \
+    $(addprefix --disable-,nls all-programs bfs cramfs bash-completion) \
+    $(addprefix --enable-,libuuid libblkid libmount libmount-force-mountinfo mount) \
+    $(addprefix --enable-,uuidd mount agetty) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -1441,20 +1441,24 @@ CLEAN += util-linux
 # 
 systemd_DIR = $(PROJDIR)/package-dev/systemd
 systemd_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(systemd_DIR)
-systemd_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
+systemd_CFGENV = PYTHON=python3 \
+    PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
     PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
-systemd_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    $(addprefix --without-,kill-user-processes) \
-    $(addprefix --disable-,nls dbus utmp kmod xkbcommon blkid seccomp ima) \
-    $(addprefix --disable-,selinux apparmor adm-group wheel-group xz zlib) \
-    $(addprefix --disable-,bzip2 lz4 pam acl smack gcrypt audit elfutils) \
-    $(addprefix --disable-,libcryptsetup grencode gnutls microhttpd libcurl) \
-    $(addprefix --disable-,libidn libiptc binfmt vconsole quotacheck tmpfiles) \
-    $(addprefix --disable-,sysusers firstboot randomseed backlight rfkill) \
-    $(addprefix --disable-,logind machined importd hostnamed timedated) \
-    $(addprefix --disable-,timesyncd localed coredump polkit resolved networkd) \
-    $(addprefix --disable-,efi gnuefi tpm kdbus myhostname hwdb manpages) \
-    $(addprefix --disable-,hibernate ldconfig split-usr tests) \
+systemd_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
+    --with-default-dnssec=no \
+    $(addprefix --without-,python) \
+    $(addprefix --disable-,nsl dbus xkbcommon seccomp ima selinux apparmor) \
+    $(addprefix --disable-,adm-group wheel-group xz zlib lz4 pam acl) \
+    $(addprefix --disable-,smack gcrypt audit elfutils libcryptsetup qrencode) \
+    $(addprefix --disable-,gnutls microhttpd libcurl libidn libiptc binfmt) \
+    $(addprefix --disable-,vconsole quotacheck tmpfiles sysusers firstboot) \
+    $(addprefix --disable-,randomseed backlight rfkill logind machined importd) \
+    $(addprefix --disable-,hostnamed timedated timesyncd localed coredump) \
+    $(addprefix --disable-,polkit resolved networkd efi kdbus myhostname hwdb) \
+    $(addprefix --disable-,manpages hibernate ldconfig) \
+    --enable-split-usr \
+    PYTHON=python3 \
+    LIBS="-lcap -luuid -lblkid -lmount" \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/usr/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -L$(DESTDIR)/usr/lib"
 
@@ -1599,7 +1603,7 @@ mesa_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mesa_DIR)
 mesa_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
     PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
 mesa_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    $(addprefix --disable-,dri3) \
+    $(addprefix --disable-,dri3 glx) \
     --with-gallium-drivers=vc4 --with-dri-drivers= \
     --with-egl-platforms=drm \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libdrm -fPIC" \
