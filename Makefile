@@ -21,6 +21,9 @@ endif
 
 export PATH := $(subst $(SPACE),:,$(strip $(EXTRA_PATH)) $(PATH))
 
+# PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig
+PKG_CONFIG_ENV=PKG_CONFIG_SYSROOT_DIR=$(DESTDIR) PKG_CONFIG_LIBDIR=$(DESTDIR)/lib/pkgconfig
+
 $(info Makefile *** CROSS_COMPILE_PATH=$(CROSS_COMPILE_PATH))
 $(info Makefile *** CROSS_COMPILE=$(CROSS_COMPILE))
 $(info Makefile *** PATH=$(PATH))
@@ -1406,6 +1409,7 @@ util-linux_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     $(addprefix --without-,tinfo ncurses btrfs) \
     $(addprefix --disable-,nls all-programs bfs cramfs bash-completion pylibmount) \
     $(addprefix --enable-,libuuid libblkid libmount libmount-force-mountinfo) \
+    $(PKG_CONFIG_ENV) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -1433,20 +1437,28 @@ util-linux%:
 	  $(MAKE) util-linux_makefile; \
 	fi
 	$(util-linux_MAKE) $(patsubst _%,%,$(@:util-linux%=%))
+	if [ "$(patsubst _%,%,$(@:util-linux%=%))" = "install" ]; then \
+	  for i in libblkid libmount libuuid; do \
+	    $(RM) $(DESTDIR)/lib/$${i}.la $(DESTDIR)/lib/$${i}.*.la; \
+	  done; \
+	fi
 
 CLEAN += util-linux
 
 #------------------------------------
+# dependent: libcap util-linux
+# remove *.la in library before build 
 # 
 systemd_DIR = $(PROJDIR)/package-dev/systemd
 systemd_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(systemd_DIR)
-systemd_CFGENV = PYTHON=python3 \
-    PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
-    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
+#systemd_CFGENV = PYTHON=python3 \
+#    PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
+#    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
+#    LIBS="-lcap -luuid -lblkid -lmount"
 systemd_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
     --with-default-dnssec=no \
-    $(addprefix --without-,python) \
-    $(addprefix --disable-,nsl dbus xkbcommon seccomp ima selinux apparmor) \
+    $(addprefix --without-,python kill-user-processes) \
+    $(addprefix --disable-,nls dbus xkbcommon seccomp ima selinux apparmor) \
     $(addprefix --disable-,adm-group wheel-group xz zlib lz4 pam acl) \
     $(addprefix --disable-,smack gcrypt audit elfutils libcryptsetup qrencode) \
     $(addprefix --disable-,gnutls microhttpd libcurl libidn libiptc binfmt) \
@@ -1456,7 +1468,9 @@ systemd_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
     $(addprefix --disable-,polkit resolved networkd efi kdbus myhostname hwdb) \
     $(addprefix --disable-,manpages hibernate ldconfig) \
     --enable-split-usr \
-    PYTHON=python3 \
+    PYTHON=python3 $(PKG_CONFIG_ENV) \
+    BLKID_LIBS="-luuid -lblkid" \
+    MOUNT_LIBS="-luuid -lblkid -lmount" \
     LIBS="-lcap -luuid -lblkid -lmount" \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/usr/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -L$(DESTDIR)/usr/lib"
@@ -1596,6 +1610,8 @@ presentproto%:
 CLEAN += presentproto
 
 #------------------------------------
+# dependent: systemd(libudev, libcap util-linux),
+#    
 #
 mesa_DIR = $(PROJDIR)/package-dev/mesa
 mesa_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mesa_DIR)
@@ -2071,6 +2087,10 @@ userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
 	$(MAKE) SRCFILE="dbus-1 bluetooth" \
 	    SRCDIR=$(DESTDIR)/etc \
 	    DESTDIR=$(userland_DIR)/etc dist-cp
+
+userland-mesa: $(addsuffix _install,openssl libdrm libcap util-linux dri2proto presentproto)
+	$(MAKE) $(addsuffix _install,systemd)
+
 
 distdir ?= $(PROJDIR)/dist/$(PLATFORM)
 dist: linux_uImage # userland
