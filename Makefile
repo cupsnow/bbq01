@@ -22,7 +22,7 @@ endif
 export PATH := $(subst $(SPACE),:,$(strip $(EXTRA_PATH)) $(PATH))
 
 # PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig
-PKG_CONFIG_ENV=PKG_CONFIG_SYSROOT_DIR=$(DESTDIR) PKG_CONFIG_LIBDIR=$(DESTDIR)/lib/pkgconfig
+PKG_CONFIG_ENV=PKG_CONFIG=pkg-config PKG_CONFIG_SYSROOT_DIR=$(DESTDIR) PKG_CONFIG_LIBDIR=$(DESTDIR)/lib/pkgconfig
 
 $(info Makefile *** CROSS_COMPILE_PATH=$(CROSS_COMPILE_PATH))
 $(info Makefile *** CROSS_COMPILE=$(CROSS_COMPILE))
@@ -1615,12 +1615,12 @@ CLEAN += presentproto
 #
 mesa_DIR = $(PROJDIR)/package-dev/mesa
 mesa_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mesa_DIR)
-mesa_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
-    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
+#mesa_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
+#    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
 mesa_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
-    $(addprefix --disable-,glx) \
-    --with-gallium-drivers=vc4 --with-dri-drivers= \
-    --with-egl-platforms=drm \
+    $(addprefix --disable-,glx dri3) \
+    $(addprefix --with-,gallium-drivers=vc4 dri-drivers= egl-platforms=drm) \
+    $(PKG_CONFIG_ENV) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libdrm -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
@@ -1639,7 +1639,7 @@ mesa_clean mesa_distclean:
 
 mesa_makefile:
 	cd $(mesa_DIR) && \
-	  $(mesa_CFGENV) ./configure $(mesa_CFGPARAM)
+	  ./configure $(mesa_CFGPARAM)
 
 mesa%:
 	if [ ! -d $(mesa_DIR) ]; then \
@@ -2088,7 +2088,7 @@ userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
 	    SRCDIR=$(DESTDIR)/etc \
 	    DESTDIR=$(userland_DIR)/etc dist-cp
 
-userland-mesa: $(addsuffix _install,openssl libdrm libcap util-linux dri2proto presentproto)
+userland-mesa: $(addsuffix _install,openssl libdrm libcap util-linux dri2proto presentproto expat)
 	$(MAKE) $(addsuffix _install,systemd)
 
 
