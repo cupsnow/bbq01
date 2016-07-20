@@ -3,7 +3,7 @@ include $(PROJDIR)/proj.mk
 CFLAGS = -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard \
     -I$(DESTDIR)/include -I$(INSTALL_HDR_PATH)/include \
     -I$(DESTDIR)/include/libdrm
-LDFLAGS = -L$(DESTDIR)/lib -ldrm -lexpat -lgbm -lEGL -lGLESv2
+LDFLAGS = -L$(DESTDIR)/lib -ldrm -lexpat -lgbm -lglapi -lEGL -lGLESv2
 TFTPROOT = /var/local/ftproot
 
 #------------------------------------

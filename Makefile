@@ -1615,8 +1615,6 @@ CLEAN += presentproto
 #
 mesa_DIR = $(PROJDIR)/package-dev/mesa
 mesa_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mesa_DIR)
-#mesa_CFGENV = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
-#    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
 mesa_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     $(addprefix --disable-,glx dri3) \
     $(addprefix --with-,gallium-drivers=vc4 dri-drivers= egl-platforms=drm) \
@@ -1924,12 +1922,6 @@ so3:
 	    SRCDIR=$(CROSS_COMPILE_PATH)/arm-linux-gnueabihf/libc/lib \
 	    DESTDIR=$(DESTDIR)/lib dist-cp
 
-prebuilt:
-	$(MKDIR) $(DESTDIR)
-	$(RSYNC) $(PROJDIR)/prebuilt/common/* $(PREBUILT) $(DESTDIR)
-
-.PHONY: prebuilt
-
 initramfs_DIR ?= $(PROJDIR)/initramfsroot
 initramfs: tool linux_headers_install
 	$(MAKE) DESTDIR=$(initramfs_DIR) devlist so1 busybox_install
@@ -1948,12 +1940,13 @@ userland0: tool linux_headers_install
 	for i in proc sys dev tmp var/run; do \
 	  [ -d $(userland_DIR)/$$i ] || $(MKDIR) $(userland_DIR)/$$i; \
 	done
-	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
-	    DESTDIR=$(userland_DIR) so1 so2 prebuilt \
+	$(MAKE) DESTDIR=$(userland_DIR) so1 so2 \
 	    $(addsuffix _install,busybox)
+	$(RSYNC) $(PROJDIR)/prebuilt/common/* $(PROJDIR)/prebuilt/userland/* \
+	    $(userland_DIR)
 ifeq ("$(PLATFORM)","PI2")
-	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-pi/*" \
-	    DESTDIR=$(userland_DIR) prebuilt
+	$(RSYNC) $(PROJDIR)/prebuilt/userland-pi/* \
+	    $(userland_DIR)
 endif
 
 userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-c libmoss iperf wireless-tools) firmware-linux
@@ -1962,15 +1955,16 @@ userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-
 	done
 	$(MAKE) $(addsuffix _install,openssl)
 	$(MAKE) $(addsuffix _install,curl socat findme) openssh_install-nokeys
-	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland/*" \
-	    DESTDIR=$(userland_DIR) so1 so2 so3 prebuilt \
+	$(MAKE) DESTDIR=$(userland_DIR) so1 so2 so3 \
 	    $(addsuffix _install,linux_modules busybox)
+	$(RSYNC) $(PROJDIR)/prebuilt/common/* $(PROJDIR)/prebuilt/userland/* \
+	    $(userland_DIR)
 ifeq ("$(PLATFORM)","PI2")
-	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-pi/*" \
-	    DESTDIR=$(userland_DIR) prebuilt
+	$(RSYNC) $(PROJDIR)/prebuilt/userland-pi/* \
+	    $(userland_DIR)
 else
-	$(MAKE) PREBUILT="$(PROJDIR)/prebuilt/userland-bb/*" \
-	    DESTDIR=$(userland_DIR) prebuilt
+	$(RSYNC) $(PROJDIR)/prebuilt/userland-bb/* \
+	    $(userland_DIR)
 endif
 	# bzip iperf openssl openssh curl socat findme
 	$(MAKE) SRCFILE="bunzip2 bzcat bzcmp bzdiff bzegrep bzfgrep bzgrep" \
@@ -2006,13 +2000,6 @@ endif
 	$(MAKE) SRCFILE="rtl8192cufw_TMSC.bin" \
 	    SRCDIR=$(firmware-linux_DIR)/rtlwifi \
 	    DESTDIR=$(userland_DIR)/lib/firmware/rtlwifi dist-cp
-	$(MAKE) test_fb01 test_drm01
-	$(MAKE) SRCFILE="fb01" \
-	    SRCDIR=$(PROJDIR)/test/fb01/bin \
-	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
-	$(MAKE) SRCFILE="drm01" \
-	    SRCDIR=$(PROJDIR)/test/drm01/bin \
-	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
 
 .PHONY: userland
 
@@ -2090,7 +2077,45 @@ userland-bt: tool $(addsuffix _install,zlib expat libffi libical ncurses)
 
 userland-mesa: $(addsuffix _install,openssl libdrm libcap util-linux dri2proto presentproto expat)
 	$(MAKE) $(addsuffix _install,systemd)
-
+	$(MAKE) $(addsuffix _install,mesa)
+	# openssl libdrm expat
+	$(MAKE) SRCFILE="openssl kmstest modeprint modetest xmlwf" \
+	    SRCDIR=$(DESTDIR)/bin \
+	    DESTDIR=$(userland_DIR)/bin dist-cp
+	# openssl libdrm libcap util-linux expat systemd mesa
+	$(MAKE) SRCFILE="libcrypto.so libcrypto.so.* libssl.so libssl.so.* engines" \
+	    SRCFILE+="libdrm.so libdrm.so.* libkms.so libkms.so.*" \
+	    SRCFILE+="libcap.so libcap.so.*" \
+	    SRCFILE+="libblkid.so libblkid.so.* libmount.so libmount.so.* libuuid.so libuuid.so.*" \
+	    SRCFILE+="libexpat.so libexpat.so.* libudev.so libudev.so.*" \
+	    SRCFILE+="libEGL.so libEGL.so.* libgbm.so libgbm.so.* libglapi.so libglapi.so.*" \
+	    SRCFILE+="libGLESv1_CM.so libGLESv1_CM.so.* libGLESv2.so libGLESv2.so.*" \
+	    SRCFILE+="" \
+	    SRCFILE+="" \
+	    SRCDIR=$(DESTDIR)/lib \
+	    DESTDIR=$(userland_DIR)/lib dist-cp
+	# mesa
+	$(MAKE) SRCFILE="vc4_dri.so" \
+	    SRCDIR=$(DESTDIR)/lib/dri \
+	    DESTDIR=$(userland_DIR)/lib/dri dist-cp
+	# openssl
+	$(MAKE) SRCFILE="openssl" \
+	    SRCDIR=$(DESTDIR)/usr \
+	    DESTDIR=$(userland_DIR)/usr dist-cp
+	# systemd
+	$(MAKE) SRCFILE="udevadm" \
+	    SRCDIR=$(DESTDIR)/usr/bin \
+	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
+	$(MAKE) test_fb01 test_drm01 test_egl1
+	$(MAKE) SRCFILE="fb01" \
+	    SRCDIR=$(PROJDIR)/test/fb01/bin \
+	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
+	$(MAKE) SRCFILE="drm01" \
+	    SRCDIR=$(PROJDIR)/test/drm01/bin \
+	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
+	$(MAKE) SRCFILE="eglinfo eglkms" \
+	    SRCDIR=$(PROJDIR)/test/egl1/bin \
+	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
 
 distdir ?= $(PROJDIR)/dist/$(PLATFORM)
 dist: linux_uImage # userland

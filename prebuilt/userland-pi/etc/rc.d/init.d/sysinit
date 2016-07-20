@@ -2,9 +2,9 @@
 
 . /etc/rc.d/init.d/functions
 
-for i in proc sys dev; do
-  [ ! -d /$i ] && mkdir -p /$i
-done
+# for i in proc sys dev; do
+#   [ ! -d /$i ] && mkdir -p /$i
+# done
 mount -t proc none /proc
 mount -t sysfs none /sys
 mount -t tmpfs none /dev
@@ -20,6 +20,10 @@ check_status
 echo -n "Redirect standard I/O ..."
   IODEV=/dev/ttyAMA0
   [ -c $IODEV ] && exec <$IODEV &>$IODEV
+check_status
+
+echo -n "Remount root writable ..."
+  mount -o rw,remount / 
 check_status
 
 echo -n "Start pseudo terminal ..."
