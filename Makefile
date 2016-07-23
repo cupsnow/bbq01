@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = PI2
+PLATFORM = BBB
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -191,10 +191,10 @@ linux_dir:
 #	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.6.3.tar.xz && \
 #	  tar -Jxvf linux-4.6.3.tar.xz
 	cd $(dir $(linux_DIR)) && \
-	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.7-rc5.tar.xz && \
-	  tar -Jxvf linux-4.7-rc5.tar.xz
+	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.7-rc7.tar.xz && \
+	  tar -Jxvf linux-4.7-rc7.tar.xz
 	cd $(dir $(linux_DIR)) && \
-	  ln -sf linux-4.7-rc5 $(notdir $(linux_DIR))	  
+	  ln -sf linux-4.7-rc7 $(notdir $(linux_DIR))	  
 #endif
 
 linux_config:
@@ -1374,10 +1374,12 @@ CLEAN += libdrm
 #------------------------------------
 # 
 libcap_DIR = $(PROJDIR)/package-dev/libcap
+
+# CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+# LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
+# BUILD_CFLAGS=""
+
 libcap_MAKE = $(MAKE) CC=$(CC) BUILD_CC=gcc prefix=/ lib=lib RAISE_SETFCAP=no \
-    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
-    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib" \
-    BUILD_CFLAGS="" \
     DESTDIR=$(DESTDIR) -C $(libcap_DIR)
 
 libcap: libcap_;
@@ -1451,10 +1453,6 @@ CLEAN += util-linux
 # 
 systemd_DIR = $(PROJDIR)/package-dev/systemd
 systemd_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(systemd_DIR)
-#systemd_CFGENV = PYTHON=python3 \
-#    PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig \
-#    PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)
-#    LIBS="-lcap -luuid -lblkid -lmount"
 systemd_CFGPARAM = --prefix=/ --host=`$(CC) -dumpmachine` \
     --with-default-dnssec=no \
     $(addprefix --without-,python kill-user-processes) \
@@ -1482,14 +1480,21 @@ systemd_dir:
 	  wget --progress=bar -N https://github.com/systemd/systemd/archive/v230.tar.gz \
 	      -O systemd-v230.tar.gz && \
 	  tar -zxvf systemd-v230.tar.gz && \
-	  ln -sf systemd-v230 $(systemd_DIR)
+	  ln -sf systemd-230 $(systemd_DIR)
 
 systemd_clean systemd_distclean:
 	if [ -e $(systemd_DIR)/Makefile ]; then \
 	  $(systemd_MAKE) $(patsubst _%,%,$(@:systemd%=%)); \
 	fi
 
+systemd_configure:
+	cd $(systemd_DIR) && \
+	  ./autogen.sh
+
 systemd_makefile:
+	if [ ! -e $(systemd_DIR)/configure ]; then \
+	  $(MAKE) systemd_configure; \
+	fi
 	cd $(systemd_DIR) && \
 	  $(systemd_CFGENV) ./configure $(systemd_CFGPARAM)
 
