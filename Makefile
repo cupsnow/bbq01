@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = BBB
+PLATFORM = XM
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -133,9 +133,9 @@ uboot: uboot_;
 
 uboot_dir:
 	cd $(dir $(uboot_DIR)) && \
-	  wget ftp://ftp.denx.de/pub/u-boot/u-boot-2016.03-rc3.tar.bz2 && \
-	  tar -jxvf u-boot-2016.03-rc3.tar.bz2 && \
-	  ln -sf u-boot-2016.03-rc3 $(uboot_DIR)
+	  wget ftp://ftp.denx.de/pub/u-boot/u-boot-2016.07.tar.bz2 && \
+	  tar -jxvf u-boot-2016.07.tar.bz2 && \
+	  ln -sf u-boot-2016.07 $(uboot_DIR)
 
 uboot_config:
 ifeq ("$(PLATFORM)","XM")
@@ -170,6 +170,8 @@ linux_MAKEPARAM = CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
 
 ifeq ("$(PLATFORM)","PI2")
 linux_MAKEPARAM += LOADADDR=0x0C100000
+else ifeq ("$(PLATFORM)","XM")
+linux_MAKEPARAM += LOADADDR=0x83000000
 else
 linux_MAKEPARAM += LOADADDR=0x80008000
 endif
@@ -1655,6 +1657,47 @@ mesa%:
 
 CLEAN += mesa
 
+
+#------------------------------------
+# dependent: systemd(libudev, libcap util-linux),
+#    
+#
+pvrsdk_DIR = $(PROJDIR)/package-dev/pvrsdk
+pvrsdk_MAKE = $(MAKE) DESTDIR=$(DESTDIR) CROSS_COMPILE=$(CROSS_COMPILE) \
+    OMAPES=8.x \
+    LINUX_DEVKIT_PATH=$(CROSS_COMPILE_PATH) \
+    SDK_INSTALL_DIR=$(PROJDIR)/package-dev \
+    GRAPHICS_INSTALL_DIR=$(PROJDIR)/package-dev/pvrsdk \
+    KERNEL_INSTALL_DIR=$(linux_DIR) \
+    -C $(pvrsdk_DIR)
+
+pvrsdk: pvrsdk_;
+
+pvrsdk_dir:
+	cd $(dir $(pvrsdk_DIR)) && \
+	  tar -jxvf $(PROJDIR)/ext/Graphics_SDK_hardfp_5_01_01_02.tar.bz2 && \
+	  ln -sf Graphics_SDK_hardfp_5_01_01_02 $(pvrsdk_DIR)
+
+pvrsdk_clean pvrsdk_distclean:
+	if [ -e $(pvrsdk_DIR)/Makefile ]; then \
+	  $(pvrsdk_MAKE) $(patsubst _%,%,$(@:pvrsdk%=%)); \
+	fi
+
+pvrsdk_makefile:
+	cd $(pvrsdk_DIR) && \
+	  ./configure $(pvrsdk_CFGPARAM)
+
+pvrsdk%:
+	if [ ! -d $(pvrsdk_DIR) ]; then \
+	  $(MAKE) pvrsdk_dir; \
+	fi
+	if [ ! -e $(pvrsdk_DIR)/Makefile ]; then \
+	  $(MAKE) pvrsdk_makefile; \
+	fi
+	$(pvrsdk_MAKE) $(patsubst _%,%,$(@:pvrsdk%=%))
+
+CLEAN += pvrsdk
+
 #------------------------------------
 #
 webme_DIR = $(PROJDIR)/package/webme
@@ -2128,14 +2171,6 @@ dist: linux_uImage # userland
 ifeq ("$(PLATFORM)","PI2")
 	$(CP) $(linux_DIR)/arch/arm/boot/zImage \
 	    $(distdir)/kernel.img	    
-#	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2709-rpi-2-b.dtb \
-#	    $(firmware-pi_DIR)/boot/bootcode.bin \
-#	    $(firmware-pi_DIR)/boot/start.elf \
-#	    $(firmware-pi_DIR)/boot/fixup.dat \
-#	    $(firmware-pi_DIR)/boot/start_x.elf \
-#	    $(firmware-pi_DIR)/boot/fixup_x.dat \
-#	    $(PROJDIR)/prebuilt/boot-pi/* \
-#	    $(distdir)/
 	$(CP) \
 	    $(firmware-pi_DIR)/boot/bootcode.bin \
 	    $(firmware-pi_DIR)/boot/start.elf \
@@ -2150,12 +2185,15 @@ else ifeq ("$(PLATFORM)","XM")
 	$(MAKE) initramfs uboot linux_dtbs
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
 	    $(distdir)/
-	$(CP) $(linux_DIR)/arch/arm/boot/dts/omap3-beagle-xm.dtb \
+	$(CP) $(linux_DIR)/arch/arm/boot/dts/omap3-beagle-xm-ab.dtb \
 	    $(distdir)/dtb
 	$(CP) $(linux_DIR)/arch/arm/boot/uImage \
 	    $(distdir)/
 	$(CP) initramfs \
 	    $(distdir)/initramfs
+	mkimage -C none -A arm -T script \
+	    -d $(PROJDIR)/package/ubootscr-xm/boot.sh \
+	    $(distdir)/boot.scr
 else ifeq ("$(PLATFORM)","BBB")
 	$(MAKE) initramfs uboot linux_dtbs
 	$(CP) $(uboot_DIR)/u-boot.img $(uboot_DIR)/MLO \
