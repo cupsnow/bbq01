@@ -2010,6 +2010,9 @@ userland: tool linux_modules $(addsuffix _install,linux_headers zlib bzip2 json-
 ifeq ("$(PLATFORM)","PI2")
 	$(RSYNC) $(PROJDIR)/prebuilt/userland-pi/* \
 	    $(userland_DIR)
+else ifeq ("$(PLATFORM)","XM")
+	$(RSYNC) $(PROJDIR)/prebuilt/userland-xm/* \
+	    $(userland_DIR)
 else
 	$(RSYNC) $(PROJDIR)/prebuilt/userland-bb/* \
 	    $(userland_DIR)
