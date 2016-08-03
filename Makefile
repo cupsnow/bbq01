@@ -1624,7 +1624,7 @@ mesa_DIR = $(PROJDIR)/package-dev/mesa
 mesa_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(mesa_DIR)
 mesa_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
     $(addprefix --disable-,glx dri3) \
-    $(addprefix --with-,gallium-drivers=vc4 dri-drivers= egl-platforms=drm) \
+    $(addprefix --with-,gallium-drivers=swrast,vc4 dri-drivers=swrast egl-platforms=drm) \
     $(PKG_CONFIG_ENV) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -I$(DESTDIR)/include/libdrm -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
