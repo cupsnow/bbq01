@@ -4,7 +4,7 @@ PROJDIR = $(abspath .)
 include $(PROJDIR)/proj.mk
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = XM
+PLATFORM = PI2
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -169,7 +169,8 @@ linux_MAKEPARAM = CROSS_COMPILE=$(CROSS_COMPILE) ARCH=arm \
     KDIR=$(linux_DIR)
 
 ifeq ("$(PLATFORM)","PI2")
-linux_MAKEPARAM += LOADADDR=0x0C100000
+#linux_MAKEPARAM += LOADADDR=0x0C100000
+linux_MAKEPARAM += LOADADDR=0x00200000
 else ifeq ("$(PLATFORM)","XM")
 linux_MAKEPARAM += LOADADDR=0x83000000
 else
@@ -193,10 +194,10 @@ linux_dir:
 #	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.6.3.tar.xz && \
 #	  tar -Jxvf linux-4.6.3.tar.xz
 	cd $(dir $(linux_DIR)) && \
-	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/testing/linux-4.7-rc7.tar.xz && \
-	  tar -Jxvf linux-4.7-rc7.tar.xz
-	cd $(dir $(linux_DIR)) && \
-	  ln -sf linux-4.7-rc7 $(notdir $(linux_DIR))	  
+	  wget --progress=bar -N https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.7.tar.xz && \
+	  tar -Jxvf linux-4.7.tar.xz
+	$(RM) -rf $(linux_DIR)
+	cd $(dir $(linux_DIR)) && ln -sf linux-4.7 $(notdir $(linux_DIR))	  
 #endif
 
 linux_config:
@@ -331,9 +332,9 @@ openssl: openssl_;
 
 openssl_dir:
 	cd $(dir $(openssl_DIR)) && \
-	  wget https://www.openssl.org/source/openssl-1.0.2f.tar.gz && \
-	  tar -zxvf openssl-1.0.2f.tar.gz && \
-	  ln -sf openssl-1.0.2f $(openssl_DIR)
+	  wget https://www.openssl.org/source/openssl-1.0.2h.tar.gz && \
+	  tar -zxvf openssl-1.0.2h.tar.gz && \
+	  ln -sf openssl-1.0.2h $(openssl_DIR)
 	$(openssl_MAKE) clean
 
 openssl_clean openssl_distclean:
@@ -526,13 +527,15 @@ wireless-tools_DIR = $(PROJDIR)/package/wireless-tools
 wireless-tools_MAKE = $(MAKE) PREFIX=$(DESTDIR) CC=$(CC) AR=$(AR) \
     RANLIB=$(RANLIB) BUILD_STATIC=1 -C $(wireless-tools_DIR)
 
+wireless-tools: wireless-tools_
+
 wireless-tools_dir:
 	cd $(dir $(wireless-tools_DIR)) && \
 	  wget http://www.labs.hpe.com/personal/Jean_Tourrilhes/Linux/wireless_tools.29.tar.gz && \
 	  tar -zxvf wireless_tools.29.tar.gz
 	ln -sf $(dir $(wireless-tools_DIR))/wireless_tools.29 $(wireless-tools_DIR)
 
-wireless-tools wireless-tools%:
+wireless-tools%:
 	if [ ! -d $(wireless-tools_DIR) ]; then \
 	  $(MAKE) wireless-tools_dir; \
 	fi
@@ -1194,13 +1197,15 @@ wpa-supplicant_MAKE = PKG_CONFIG_PATH=$(DESTDIR)/lib/pkgconfig PKG_CONFIG_SYSROO
 	CONFIG_LIBNL32=y CONFIG_LIBNL3_ROUTE=y CONFIG_WPS=1 CONFIG_SMARTCARD=n V=1 \
     -C $(wpa-supplicant_DIR)/wpa_supplicant
 
+wpa-supplicant: wpa-supplicant_;
+
 wpa-supplicant_dir:
 	cd $(dir $(wpa-supplicant_DIR)) && \
 	  wget https://w1.fi/releases/wpa_supplicant-2.5.tar.gz && \
 	  tar -zxvf wpa_supplicant-2.5.tar.gz
 	ln -sf $(dir $(wpa-supplicant_DIR))/wpa_supplicant-2.5 $(wpa-supplicant_DIR)
 
-wpa-supplicant wpa-supplicant%:
+wpa-supplicant%:
 	if [ ! -d $(wpa-supplicant_DIR) ]; then \
 	  $(MAKE) wpa-supplicant_dir; \
 	fi
@@ -1335,24 +1340,63 @@ ffmpeg%:
 
 CLEAN += ffmpeg
 
+
 #------------------------------------
 #
-libdrm_DIR = $(PROJDIR)/package/libdrm
+pthreadstub_DIR = $(PROJDIR)/package-dev/pthreadstub
+pthreadstub_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(pthreadstub_DIR)
+pthreadstub_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` --enable-static \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
+
+pthreadstub: pthreadstub_;
+
+pthreadstub_dir:
+	$(MKDIR) $(dir $(pthreadstub_DIR))
+	cd $(dir $(pthreadstub_DIR)) && \
+	  wget --progress=bar -N https://xcb.freedesktop.org/dist/libpthread-stubs-0.3.tar.bz2 && \
+	  tar -jxvf libpthread-stubs-0.3.tar.bz2 && \
+	  ln -sf libpthread-stubs-0.3 $(pthreadstub_DIR)
+
+pthreadstub_clean pthreadstub_distclean:
+	if [ -e $(pthreadstub_DIR)/Makefile ]; then \
+	  $(pthreadstub_MAKE) $(patsubst _%,%,$(@:pthreadstub%=%)); \
+	fi
+
+pthreadstub_makefile:
+	cd $(pthreadstub_DIR) && ./configure $(pthreadstub_CFGPARAM)
+
+pthreadstub%:
+	if [ ! -d $(pthreadstub_DIR) ]; then \
+	  $(MAKE) pthreadstub_dir; \
+	fi
+	if [ ! -e $(pthreadstub_DIR)/Makefile ]; then \
+	  $(MAKE) pthreadstub_makefile; \
+	fi
+	$(pthreadstub_MAKE) $(patsubst _%,%,$(@:pthreadstub%=%))
+
+CLEAN += pthreadstub
+
+#------------------------------------
+#
+libdrm_DIR = $(PROJDIR)/package-dev/libdrm
 libdrm_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(libdrm_DIR)
 libdrm_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` --enable-static \
     --with-kernel-source=$(linux_DIR) \
     $(addprefix --disable-,intel radeon amdgpu nouveau vmwgfx freedreno) \
     $(addprefix --enable-,omap-experimental-api install-test-programs) \
+    $(PKG_CONFIG_ENV) \
     CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
     LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib"
 
 libdrm: libdrm_;
 
 libdrm_dir:
+	$(MKDIR) $(dir $(libdrm_DIR))
 	cd $(dir $(libdrm_DIR)) && \
-	  wget --progress=bar -N https://dri.freedesktop.org/libdrm/libdrm-2.4.68.tar.bz2 && \
-	  tar -jxvf libdrm-2.4.68.tar.bz2 && \
-	  ln -sf libdrm-2.4.68 $(libdrm_DIR)
+	  wget --progress=bar -N https://dri.freedesktop.org/libdrm/libdrm-2.4.70.tar.bz2 && \
+	  tar -jxvf libdrm-2.4.70.tar.bz2 && \
+	  ln -sf libdrm-2.4.70 $(libdrm_DIR)
 
 libdrm_clean libdrm_distclean:
 	if [ -e $(libdrm_DIR)/Makefile ]; then \
@@ -1787,6 +1831,8 @@ CLEAN += gpioctl-pi
 #
 rtl8192cu_DIR = $(PROJDIR)/package/rtl8192cu
 
+rtl8192cu: rtl8192cu_;
+
 rtl8192cu_dir:
 	cd $(dir $(rtl8192cu_DIR)) && \
 	  unzip 0001-RTL8188C_8192C_USB_linux_v4.0.2_9000.20130911.zip
@@ -1794,7 +1840,7 @@ rtl8192cu_dir:
 	  tar -zxvf rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911.tar.gz
 	ln -sf $(dir $(rtl8192cu_DIR))/RTL8188C_8192C_USB_linux_v4.0.2_9000.20130911/driver/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911 $(rtl8192cu_DIR)
 
-rtl8192cu rtl8192cu_%:
+rtl8192cu%:
 	$(MAKE) DESTDIR=$(DESTDIR) $(linux_MAKEPARAM) KSRC=$(linux_DIR) \
 	    CONFIG_PLATFORM_I386_PC=n CONFIG_PLATFORM_TI_AM3517=y \
 	    -C $(rtl8192cu_DIR) $(patsubst _%,%,$(@:rtl8192cu%=%))
@@ -1878,6 +1924,41 @@ CLEAN += python
 
 #------------------------------------
 #
+mosquitto_DIR = $(PROJDIR)/package-dev2/mosquitto
+mosquitto_MAKE = $(MAKE) DESTDIR=$(DESTDIR) prefix=/ \
+	CROSS_COMPILE=$(CROSS_COMPILE) CC=gcc \
+    CFLAGS="$(PLATFORM_CFLAGS) -I$(DESTDIR)/include -fPIC" \
+    LDFLAGS="$(PLATFORM_LDFLAGS) -L$(DESTDIR)/lib -lssl -lcrypto" \
+    WITH_SRV=no \
+    -C $(mosquitto_DIR)
+
+mosquitto: mosquitto_;
+
+mosquitto_dir:
+	git clone https://github.com/eclipse/mosquitto $(mosquitto_DIR)-hot
+	ln -sf $(mosquitto_DIR)-hot $(mosquitto_DIR)
+
+mosquitto_clean mosquitto_distclean:
+	if [ -e $(mosquitto_DIR)/Makefile ]; then \
+	  $(mosquitto_MAKE) $(patsubst _%,%,$(@:mosquitto%=%)); \
+	fi
+
+mosquitto_makefile:
+	cd $(mosquitto_DIR) && ./configure $(mosquitto_CFGPARAM)
+
+mosquitto%:
+	if [ ! -d $(mosquitto_DIR) ]; then \
+	  $(MAKE) mosquitto_dir; \
+	fi
+	if [ ! -e $(mosquitto_DIR)/Makefile ]; then \
+	  $(MAKE) mosquitto_makefile; \
+	fi
+	$(mosquitto_MAKE) $(patsubst _%,%,$(@:mosquitto%=%))
+
+CLEAN += mosquitto
+
+#------------------------------------
+#
 avrdude_DIR = $(PROJDIR)/package/avrdude
 avrdude_MAKE = $(MAKE) DESTDIR=$(DESTDIR) -C $(avrdude_DIR)
 avrdude_CFGPARAM = --prefix= --host=`$(CC) -dumpmachine` \
@@ -1916,10 +1997,12 @@ CLEAN += avrdude
 #
 firmware-linux_DIR = $(PROJDIR)/package/firmware-linux
 
+firmware-linux: firmware-linux_;
+
 firmware-linux_dir:
 	git clone --depth=1 git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git $(firmware-linux_DIR); \
 
-firmware-linux firmware-linux%:
+firmware-linux%:
 	if [ ! -d $(firmware-linux_DIR) ]; then \
 	  $(MAKE) firmware-linux_dir; \
 	fi
@@ -2169,11 +2252,11 @@ userland-mesa: $(addsuffix _install,openssl libdrm libcap util-linux dri2proto p
 	    DESTDIR=$(userland_DIR)/usr/bin dist-cp
 
 distdir ?= $(PROJDIR)/dist/$(PLATFORM)
-dist: linux_uImage # userland
+dist: linux_uImage linux_dtbs # userland
 	$(MKDIR) $(distdir)
 ifeq ("$(PLATFORM)","PI2")
 	$(CP) $(linux_DIR)/arch/arm/boot/zImage \
-	    $(distdir)/kernel.img	    
+	    $(distdir)/kernel7.img
 	$(CP) \
 	    $(firmware-pi_DIR)/boot/bootcode.bin \
 	    $(firmware-pi_DIR)/boot/start.elf \
@@ -2181,7 +2264,8 @@ ifeq ("$(PLATFORM)","PI2")
 	    $(firmware-pi_DIR)/boot/start_x.elf \
 	    $(firmware-pi_DIR)/boot/fixup_x.dat \
 	    $(PROJDIR)/prebuilt/boot-pi/* \
-	    $(distdir)/	    
+	    $(linux_DIR)/arch/arm/boot/dts/bcm2836-rpi-2-b.dtb \
+	        $(distdir)
 	$(CP) $(linux_DIR)/arch/arm/boot/dts/bcm2836-rpi-2-b.dtb \
 	    $(distdir)/bcm2709-rpi-2-b.dtb
 else ifeq ("$(PLATFORM)","XM")

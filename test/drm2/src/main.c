@@ -47,17 +47,7 @@ static struct {
 		PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC glEGLImageTargetRenderbufferStorageOES;
 	} glext;
 
-//    drmModeRes *drm_res;
-//    drmModeConnector *drm_conn;
-//    drmModeEncoder *drm_enc;
-//    drmModeModeInfo *drm_mode;
     uint32_t drm_fb;
-//    uint32_t drm_conn_id;
-
-//	struct gbm_device *gbm;
-//    struct gbm_bo *gbm_bo;
-//    union gbm_bo_handle gbm_handle;
-//    uint32_t gbm_stride;
 
 	EGLDisplay disp;
 	EGLContext ctx;
