@@ -2329,7 +2329,7 @@ clean:
 distclean:
 	$(MAKE) $(addsuffix _$@,$(CLEAN))
 	$(RM) $(DESTDIR) $(initramfs_DIR) initramfs initramfs.cpio.gz \
-	  $(userland_DIR) dist
+	    $(userland_DIR) dist
 
 #------------------------------------
 #

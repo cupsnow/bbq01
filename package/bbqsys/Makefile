@@ -4,7 +4,6 @@ PROJDIR ?= $(abspath $(dir $(firstword $(wildcard $(addsuffix /proj.mk,. ../..))
 include $(PROJDIR)/proj.mk
 
 PKGDIR = $(PROJDIR)/package
-WGET = wget -N
 
 # BB, XM, QEMU, PI2, BBB
 PLATFORM = PI2
@@ -43,23 +42,6 @@ $(eval $(call PROJ_DIST_CP))
 
 #------------------------------------
 #
-env.sh: ;
-	$(RM) $@; touch $@ && chmod +x $@ 
-	echo "#!/bin/sh" >> $@
-	echo "export PLATFORM="'"'"$(PLATFORM)"'"' >> $@
-	echo "export PATH="'"'"$(PATH)"'"' >> $@
-	echo "export CROSS_COMPILE="'"'"$(CROSS_COMPILE)"'"' >> $@
-	echo "export CC="'"'"$(CC)"'"' >> $@
-	echo "export LD="'"'"$(LD)"'"' >> $@
-	echo "export PLATFORM_CFLAGS="'"'"$(PLATFORM_CFLAGS)"'"' >> $@
-	echo "export PLATFORM_LDFLAGS="'"'"$(PLATFORM_LDFLAGS)"'"' >> $@
-	echo "export PKG_CONFIG_SYSROOT_DIR=$(DESTDIR)" >> $@
-	echo "export PKG_CONFIG_PATH=${PKG_CONFIG_SYSROOT_DIR}/lib/pkgconfig" >> $@
-
-.PHONY: env.sh
-
-#------------------------------------
-#
 tool: ;
 
 .PHONY: tool
@@ -72,12 +54,7 @@ uboot_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
 uboot: uboot_;
 
 uboot_dir:
-	$(MKDIR) $(PKGDIR) $(dir $(uboot_DIR))
-	cd $(PKGDIR) && \
-	  $(WGET) ftp://ftp.denx.de/pub/u-boot/u-boot-2016.07.tar.bz2 && \
-	  tar -jxvf u-boot-2016.07.tar.bz2
-	$(RM) $(uboot_DIR)
-	ln -sf $(PKGDIR)/u-boot-2016.07 $(uboot_DIR)
+	$(call PROJ_WGET,$(uboot_DIR),$(PKGDIR),ftp://ftp.denx.de/pub/u-boot/u-boot-2016.07.tar.bz2)
 
 uboot_config:
 ifeq ("$(PLATFORM)","XM")
@@ -124,12 +101,7 @@ linux_MAKE = $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR)
 linux: linux_;
 
 linux_dir:
-	$(MKDIR) $(PKGDIR) $(dir $(linux_DIR))
-	cd $(PKGDIR) && \
-	  $(WGET) https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.7.tar.xz && \
-	  tar -Jxvf linux-4.7.tar.xz
-	$(RM) $(linux_DIR)
-	ln -sf $(PKGDIR)/linux-4.7 $(linux_DIR)
+	$(call PROJ_WGET,$(linux_DIR),$(PKGDIR),https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.7.tar.xz)
 
 linux_config:
 ifeq ("$(PLATFORM)","PI2")
@@ -166,12 +138,7 @@ busybox_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) \
 busybox: busybox_;
 
 busybox_dir:
-	$(MKDIR) $(PKGDIR) $(dir $(busybox_DIR))
-	cd $(PKGDIR) && \
-	  $(WGET) https://www.busybox.net/downloads/busybox-1.24.1.tar.bz2 && \
-	  tar -jxvf busybox-1.24.1.tar.bz2
-	$(RM) $(busybox_DIR)
-	ln -sf $(PKGDIR)/busybox-1.24.1 $(busybox_DIR)
+	$(call PROJ_WGET,$(busybox_DIR),$(PKGDIR),https://www.busybox.net/downloads/busybox-1.24.1.tar.bz2)
 
 busybox_config:
 #	$(MAKE) linux_headers_install
@@ -199,6 +166,20 @@ $(PROJDIR)/tool/bin/mkimage:
 	$(MAKE) uboot_tools
 	$(MKDIR) $(dir $@)
 	$(CP) $(uboot_DIR)/tools/mkimage $(dir $@)
+
+#------------------------------------
+#
+firmware-linux_DIR = $(PROJDIR)/package/firmware-linux
+
+firmware-linux: firmware-linux_;
+
+firmware-linux_dir:
+	git clone --depth=1 git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git $(firmware-linux_DIR); \
+
+firmware-linux%:
+	if [ ! -d $(firmware-linux_DIR) ]; then \
+	  $(MAKE) firmware-linux_dir; \
+	fi
 
 #------------------------------------
 # git clone --depth=1 https://github.com/raspberrypi/firmware.git firmware-pi

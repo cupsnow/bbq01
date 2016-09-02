@@ -25,6 +25,8 @@
 # 
 # include $(PROJDIR:%=%/)/jni/proj.mk
 # 
+# PKGDIR = $(PROJDIR)/package
+
 # EXTRA_PATH = $(NDK_PATH) $(CROSS_COMPILE_PATH)/bin
 # export PATH := $(subst $(SPACE),:,$(EXTRA_PATH) $(PATH))
 # 
@@ -73,6 +75,41 @@ COLOR_CYAN = $(call _COLOR,36)
 COLOR_YELLOW = $(call _COLOR,33)
 COLOR_MAGENTA = $(call _COLOR,35)
 COLOR_GRAY = $(call _COLOR,37)
+
+#------------------------------------
+#
+EXTRACT = $(strip $(if $(filter %.tar.gz %.tgz,$(1)),tar -zxvf $(1)) \
+  $(if $(filter %.tar.bz2,$(1)),tar -jxvf $(1)) \
+  $(if $(filter %.tar.xz,$(1)),tar -Jxvf $(1)) \
+  $(if $(filter %.zip,$(1)),unzip $(1)))
+
+
+#------------------------------------
+# $(call PROJ_WGET_EXTRACT,$(PKGDIR),https://tls.mbed.org/download/mbedtls-2.2.1-apache.tgz)
+#
+define PROJ_WGET_EXTRACT
+$(MKDIR) $(1)
+cd $(1) && wget -N $(2) && $(call EXTRACT,$(notdir $(2)))
+endef
+#------------------------------------
+# $(call PROJ_WGET,$(PROJDIR)/tmp/zlib,$(PROJDIR)/tmp_hot,http://zlib.net/zlib-1.2.8.tar.xz)
+#
+define PROJ_WGET
+$(call PROJ_WGET_EXTRACT,$(2),$(3))
+$(MKDIR) $(dir $(1))
+$(RM) $(1)
+ln -sf $(2)/$(notdir $(basename $(basename $(3)))) $(1)
+endef
+
+#------------------------------------
+# $(call PROJ_GIT,$(PROJDIR)/tmp/zlib,$(PROJDIR)/tmp_hot,http://zlib.net/zlib-1.2.8.tar.xz)
+#
+define PROJ_GIT
+git clone $(3) $(2)/$(notdir $(1))-hot
+$(MKDIR) $(dir $(1))
+$(RM) $(1)
+ln -sf $(2)/$(notdir $(1))-hot $(1)
+endef
 
 #------------------------------------
 # $(eval $(call ANDPROJ_PREBUILT_STATIC,<name>,<lib path>,<header path>))

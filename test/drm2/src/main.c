@@ -144,7 +144,7 @@ finally:
 
 static int kms_setup(int fd)
 {
-	int r = EIO, i;
+	int r = EIO, i, j;
 	drmModeRes *drm_res;
 
 	if ((drm_res = drmModeGetResources(fd)) == NULL) {
@@ -197,15 +197,27 @@ static int kms_setup(int fd)
 //				(int )impl.kms.conn->modes[i].hdisplay,
 //				(int )impl.kms.conn->modes[i].vdisplay);
 //	}
+    for (i = 0, j = 0; i < impl.kms.conn->count_modes; i++) {
+    	drmModeModeInfo *drm_mode = &impl.kms.conn->modes[i];
+    	int drm_area = drm_mode->hdisplay * drm_mode->vdisplay;
 
-    impl.kms.mode = &impl.kms.conn->modes[0];
-	log_debug("kms mode[%d]: %d x %d\n", 0, (int)impl.kms.mode->hdisplay,
+    	if (drm_mode->type & DRM_MODE_TYPE_PREFERRED) {
+    		impl.kms.mode = drm_mode;
+    		break;
+    	}
+    	if (drm_area > j) {
+    		impl.kms.mode = drm_mode;
+    		j = drm_area;
+    	}
+    }
+	log_debug("kms mode: %d x %d\n", (int)impl.kms.mode->hdisplay,
 			(int)impl.kms.mode->vdisplay);
 
 	if ((impl.gbm.dev = gbm_create_device(fd)) == NULL) {
 		log_error("gbm_create_device\n");
 		goto finally;
 	}
+
     if ((impl.gbm.buf_obj = gbm_bo_create(impl.gbm.dev,
     		impl.kms.mode->hdisplay, impl.kms.mode->vdisplay,
 			GBM_BO_FORMAT_XRGB8888,
@@ -281,8 +293,11 @@ int main()
 			goto finally;
 		}
 	}
-	eglBindAPI(EGL_OPENGL_API);
-//	eglBindAPI(EGL_OPENGL_ES_API);
+	// EGL_OPENGL_API, EGL_OPENGL_ES_API
+	if (!eglBindAPI(EGL_OPENGL_ES_API)) {
+    	log_error("eglBindAPI\n");
+    	goto finally;
+	}
     if ((impl.ctx = eglCreateContext(impl.disp, NULL, EGL_NO_CONTEXT,
     		NULL)) == NULL) {
     	log_error("eglCreateContext\n");
@@ -314,7 +329,8 @@ int main()
 		}
 		if ((ver_sh = glGetString(GL_SHADING_LANGUAGE_VERSION)) == NULL) {
 			log_error("glGetString GL_SHADING_LANGUAGE_VERSION\n");
-			goto finally;
+//			goto finally;
+			ver_sh = "";
 		}
 		log_debug("GL Version: %s, GSLS: %s\n"
 				"  Extensions: %s\n"
@@ -372,4 +388,6 @@ int main()
 
 finally:
 	;
+	return 0;
 }
+
