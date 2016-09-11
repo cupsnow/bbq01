@@ -6,7 +6,7 @@ include $(PROJDIR)/proj.mk
 PKGDIR = $(PROJDIR)/package
 
 # BB, XM, QEMU, PI2, BBB
-PLATFORM = PI2
+PLATFORM = BBBTI
 
 CROSS_COMPILE_PATH = $(abspath $(PROJDIR)/tool/toolchain)
 CROSS_COMPILE := $(patsubst %gcc,%,$(notdir $(lastword $(wildcard $(CROSS_COMPILE_PATH)/bin/*gcc))))
@@ -15,9 +15,7 @@ EXTRA_PATH = $(PROJDIR)/tool/bin $(CROSS_COMPILE_PATH:%=%/bin)
 
 ifeq ("$(PLATFORM)","PI2")
 PLATFORM_CFLAGS = -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
-else ifeq ("$(PLATFORM)","BBB")
-PLATFORM_CFLAGS = -mcpu=cortex-a8 -mfpu=neon-vfpv4 -mfloat-abi=hard
-else ifeq ("$(PLATFORM)","BB")
+else
 PLATFORM_CFLAGS = -mcpu=cortex-a8 -mfpu=neon-vfpv4 -mfloat-abi=hard
 endif
 
@@ -54,11 +52,17 @@ uboot_MAKE = $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) -C $(uboot_DIR)
 uboot: uboot_;
 
 uboot_dir:
+ifeq ("$(PLATFORM)","BBBTI")
+	$(call PROJ_GIT,$(uboot_DIR),$(PKGDIR),git://git.ti.com/ti-u-boot/ti-u-boot.git)
+else
 	$(call PROJ_WGET,$(uboot_DIR),$(PKGDIR),ftp://ftp.denx.de/pub/u-boot/u-boot-2016.07.tar.bz2)
+endif
 
 uboot_config:
 ifeq ("$(PLATFORM)","XM")
 	$(uboot_MAKE) omap3_beagle_defconfig
+else ifeq ("$(PLATFORM)","BBBTI")
+	$(uboot_MAKE) am335x_boneblack_defconfig
 else ifeq ("$(PLATFORM)","BBB")
 	$(uboot_MAKE) am335x_boneblack_defconfig
 else
@@ -101,7 +105,11 @@ linux_MAKE = $(MAKE) $(linux_MAKEPARAM) -C $(linux_DIR)
 linux: linux_;
 
 linux_dir:
+ifeq ("$(PLATFORM)","BBBTI")
+	$(call PROJ_GIT,$(linux_DIR),$(PKGDIR),git://git.ti.com/processor-sdk/processor-sdk-linux.git)
+else
 	$(call PROJ_WGET,$(linux_DIR),$(PKGDIR),https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.7.tar.xz)
+endif
 
 linux_config:
 ifeq ("$(PLATFORM)","PI2")

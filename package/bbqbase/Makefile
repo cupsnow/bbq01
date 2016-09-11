@@ -562,9 +562,9 @@ mbedtls_MAKE = $(MAKE) DESTDIR=$(DESTDIR) CC=$(CC) \
     -C $(mbedtls_DIR)
 
 mbedtls_dir:
-	$(call PROJ_WGET_EXTRACT,$(PKGDIR),https://tls.mbed.org/download/mbedtls-2.2.1-apache.tgz)
+	$(call PROJ_WGET_EXTRACT,$(PKGDIR),https://tls.mbed.org/download/mbedtls-2.3.0-apache.tgz)
 	$(MKDIR) $(dir $(mbedtls_DIR)) && \
-	  $(RM) $(mbedtls_DIR) && ln -sf $(PKGDIR)/mbedtls-2.2.1 $(mbedtls_DIR)
+	  $(RM) $(mbedtls_DIR) && ln -sf $(PKGDIR)/mbedtls-2.3.0 $(mbedtls_DIR)
 
 mbedtls: mbedtls_;
 

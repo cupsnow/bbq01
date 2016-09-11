@@ -1,5 +1,5 @@
 #------------------------------------
-# PROJDIR = $(abspath ..)
+# PROJDIR ?= $(abspath $(dir $(firstword $(wildcard $(addsuffix /proj.mk,. ../..)))))
 # PROJDIR = $(abspath $(call my-dir)/..)
 # 
 # ADB_PATH = $(shell bash -c "type -P adb")
@@ -23,7 +23,7 @@
 # CROSS_COMPILE = $(patsubst %gcc,%,$(notdir $(CROSS_COMPILE_GCC)))
 # SYSROOT = $(NDK_PATH)/platforms/$(ANDPROJ_TARGET)/arch-arm
 # 
-# include $(PROJDIR:%=%/)/jni/proj.mk
+# JAVA_HOME ?= /usr/lib/jvm/java-8-openjdk-amd64
 # 
 # PKGDIR = $(PROJDIR)/package
 
@@ -33,6 +33,7 @@
 # PLATFORM = ANDROID
 # PLATFORM_CFLAGS = -isysroot $(SYSROOT) #-mfloat-abi=softfp -mfpu=neon
 # PLATFORM_LDFLAGS = --sysroot $(SYSROOT)
+# PKG_CONFIG_ENV=PKG_CONFIG=pkg-config PKG_CONFIG_SYSROOT_DIR=$(DESTDIR) PKG_CONFIG_LIBDIR=$(DESTDIR)/lib/pkgconfig
 # 
 # $(info Makefile *** PATH: $(PATH))
 #
@@ -83,6 +84,7 @@ EXTRACT = $(strip $(if $(filter %.tar.gz %.tgz,$(1)),tar -zxvf $(1)) \
   $(if $(filter %.tar.xz,$(1)),tar -Jxvf $(1)) \
   $(if $(filter %.zip,$(1)),unzip $(1)))
 
+BASENAME = $(notdir $(patsubst %.tar,%,$(basename $(1))))
 
 #------------------------------------
 # $(call PROJ_WGET_EXTRACT,$(PKGDIR),https://tls.mbed.org/download/mbedtls-2.2.1-apache.tgz)
@@ -98,7 +100,7 @@ define PROJ_WGET
 $(call PROJ_WGET_EXTRACT,$(2),$(3))
 $(MKDIR) $(dir $(1))
 $(RM) $(1)
-ln -sf $(2)/$(notdir $(basename $(basename $(3)))) $(1)
+ln -sf $(2)/$(call BASENAME,$(3)) $(1)
 endef
 
 #------------------------------------
@@ -109,6 +111,18 @@ git clone $(3) $(2)/$(notdir $(1))-hot
 $(MKDIR) $(dir $(1))
 $(RM) $(1)
 ln -sf $(2)/$(notdir $(1))-hot $(1)
+endef
+
+#------------------------------------
+# $(call PROJ_ARCHIVE,$(uboot_DIR),$(PKGDIR),$(PROJDIR)/ext/u-boot-2016.05+gitAUTOINC+b4e185a8c3-gb4e185a8c3.tar.xz)
+#
+define PROJ_ARCHIVE
+$(MKDIR) $(2)
+cd $(2) && $(call EXTRACT,$(3))
+mv $(2)/$(call BASENAME,$(3)) $(2)/$(call BASENAME,$(3))-archive
+$(MKDIR) $(dir $(1))
+$(RM) $(1)
+ln -sf $(2)/$(call BASENAME,$(3))-archive $(1) 
 endef
 
 #------------------------------------
